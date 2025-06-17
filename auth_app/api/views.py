@@ -58,7 +58,6 @@ class CustomLoginView(APIView):
                     'fullname': user.fullname,
                     'email': user.email,
                     'user_id': user.id,
-                    'detail': 'Erfolgreiche Anmeldung.'
                 }, status=status.HTTP_200_OK)
             else:
                 return Response(

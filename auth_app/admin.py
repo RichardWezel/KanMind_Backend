@@ -8,7 +8,6 @@ class CustomUserAdmin(UserAdmin):
     list_display = ('email', 'fullname', 'is_staff', 'is_active')
     fieldsets = (
         (None, {'fields': ('email', 'password')}),
-        # weitere Felder
     )
     add_fieldsets = (
         (None, {
