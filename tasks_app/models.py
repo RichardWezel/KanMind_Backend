@@ -1,12 +1,11 @@
 from django.db import models
-from boards_app.models import Board
 from auth_app.models import CustomUser
 
 class Task(models.Model):
     """
     Represents a task in the application.
     """
-    board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='tasks')
+    board = models.ForeignKey('boards_app.Board', on_delete=models.CASCADE, related_name='tasks')
     title = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=50, choices=[
@@ -31,4 +30,4 @@ class Task(models.Model):
     class Meta:
         verbose_name = "Task"
         verbose_name_plural = "Tasks"
-        ordering = ['created_at'] 
+        ordering = ['title'] 
