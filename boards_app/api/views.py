@@ -2,7 +2,7 @@
 from boards_app.models import Board
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
-from boards_app.api.serializers import BoardSerializer
+from boards_app.api.serializers import BoardSerializer, BoardDetailSerializer
 from django.db import models
 from rest_framework.response import Response
 from rest_framework import generics, status
@@ -83,7 +83,7 @@ class BoardView(ListCreateAPIView):
 
 class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticatedWithCustomMessage] 
-    serializer_class = BoardSerializer
+    serializer_class = BoardDetailSerializer
 
     def get_queryset(self):
         try:
