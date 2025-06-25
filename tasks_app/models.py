@@ -1,16 +1,18 @@
 from django.db import models
 from auth_app.models import CustomUser
+from boards_app.models import Board
+
 
 class Task(models.Model):
     """
     Represents a task in the application.
     """
-    board = models.ForeignKey('boards_app.Board', on_delete=models.CASCADE, related_name='tasks')
+    board = models.ForeignKey(Board, on_delete=models.CASCADE, related_name='tasks')
     title = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
     status = models.CharField(max_length=50, choices=[
-        ('to_do', 'To-do'),
-        ('in_progress', 'In-progress'),
+        ('to-do', 'To-do'),
+        ('in-progress', 'In-progress'),
         ('review', 'Review'),
         ('done', 'Done')
     ], default='to_do')
@@ -19,8 +21,8 @@ class Task(models.Model):
         ('medium', 'Medium'),
         ('high', 'High')
     ], default='medium')
-    assignee_id = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='assigned_tasks', blank=True, null=True) 
-    rewiewer_id = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='reviewed_tasks', blank=True, null=True)
+    assignee = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='assigned_tasks', blank=True, null=True) 
+    reviewer = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='reviewed_tasks', blank=True, null=True)
     due_date = models.DateField(null=True, blank=True)
     comments_count = models.PositiveIntegerField(default=0)
     

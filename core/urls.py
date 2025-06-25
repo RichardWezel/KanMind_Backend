@@ -26,4 +26,5 @@ urlpatterns = [
     path('api/boards/', BoardView.as_view(), name='boards'),
     path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
     path('api/boards/<int:pk>/', BoardDetailView.as_view(), name='board-detail'), 
+    path('api/tasks/', include('tasks_app.api.urls')), 
 ]

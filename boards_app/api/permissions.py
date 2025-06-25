@@ -1,6 +1,7 @@
 from rest_framework.permissions import BasePermission
 from rest_framework.exceptions import NotAuthenticated
 
+
 class IsAuthenticatedWithCustomMessage(BasePermission):
     """
     Erlaubt Zugriff nur für authentifizierte Benutzer.
@@ -11,3 +12,4 @@ class IsAuthenticatedWithCustomMessage(BasePermission):
         if not request.user or not request.user.is_authenticated:
             raise NotAuthenticated(detail="Nicht autorisiert. Der Benutzer muss eingeloggt sein.")
         return True
+
