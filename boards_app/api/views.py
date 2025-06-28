@@ -2,14 +2,20 @@
 from boards_app.models import Board
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
-from boards_app.api.serializers import BoardSerializer, BoardDetailSerializer
+from .serializers import BoardSerializer, BoardDetailSerializer, BoardUpdateSerializer
 from django.db import models
 from rest_framework.response import Response
 from rest_framework import generics, status
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
-from .permissions import IsAuthenticatedWithCustomMessage
+from .permissions import IsAuthenticatedWithCustomMessage, IsOwnerOrMemberOfBoard
+from rest_framework.exceptions import NotFound, ValidationError
+from auth_app.models import CustomUser
+
+
+
+
 
 
 class BoardView(ListCreateAPIView):
@@ -81,38 +87,75 @@ class BoardView(ListCreateAPIView):
             )
         
 
+# This view handles the retrieval, update, and deletion of a specific board.
 class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAuthenticatedWithCustomMessage] 
-    serializer_class = BoardDetailSerializer
+    permission_classes = [IsAuthenticatedWithCustomMessage, IsOwnerOrMemberOfBoard] #401, 403
+
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return BoardDetailSerializer
+        if self.request.method in ['PUT', 'PATCH']:
+            return BoardUpdateSerializer
+        if self.request.method == 'DELETE':
+            return BoardUpdateSerializer
+     
 
     def get_queryset(self):
+        user = self.request.user
         try:
-            user = self.request.user
             return Board.objects.filter(
                 models.Q(owner_id=user) | models.Q(members=user)
             ).distinct()
-            
+        except Board.DoesNotExist:
+            raise NotFound("Board nicht gefunden. Die angegebene Board-ID existiert nicht.") #404
+        
         except Exception as e:
-            Response(
-                {'detail': 'Interner Serverfehler.'},
+            return Response(
+                {"detail": "Interner Serverfehler.", "error": str(e)}, #500
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-           
-   
+    
+    def update(self, request, *args, **kwargs):
+        request_members = self.request.data.get('members', [])
+        valid_users = CustomUser.objects.filter(id__in=request_members)
+        if valid_users.count() != len(request_members):
+            raise ValidationError("Ungültige Anfragedaten. Möglicherweise sind einige Benutzer ungültig.") #400
+        
+        try:
+            partial = kwargs.pop('partial', False)
+            instance = self.get_object()
+            serializer = self.get_serializer(instance, data=request.data, partial=partial)
+            serializer.is_valid(raise_exception=True)
+            self.perform_update(serializer)
 
+            return Response(
+                {
+                    "detail": "Das Board wurde erfolgreich aktualisiert. Mitglieder wurden hinzugefügt und/oder entfernt.",
+                    "data": serializer.data
+                },
+                status=status.HTTP_200_OK
+            )
+        
+        except NotFound:
+            return Response(
+                {"detail": "Board nicht gefunden. Die angegebene Board-ID existiert nicht."}, #404
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {"detail": "Interner Serverfehler.", "error": str(e)}, #500
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        
     def perform_update(self, serializer):
-        board = self.get_object()
+        
         user = self.request.user
-
-        if board.owner_id != user:
-            raise PermissionDenied("Nur der Besitzer darf das Board aktualisieren.")
-
         board = serializer.save()
-
         members = self.request.data.get('members', [])
         board.members.set(members + [user.id])
         board.member_count = board.members.count()
         board.save()
+
 
     def perform_destroy(self, instance):
         user = self.request.user
@@ -121,3 +164,6 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
             raise PermissionDenied("Nur der Besitzer darf das Board löschen.")
 
         instance.delete()
+
+
+
