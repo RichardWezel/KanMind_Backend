@@ -17,14 +17,19 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 from auth_app.api.views import RegistrationView, CustomLoginView
-from boards_app.api.views import BoardView, BoardDetailView
+from boards_app.api.views import BoardView, BoardDetailView, EmailCheckView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+
     path('api/registration/', RegistrationView.as_view(), name='registration'),
     path('api/login/', CustomLoginView.as_view(), name='login'),
-    path('api/boards/', BoardView.as_view(), name='boards'),
     path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
+
+
+    path('api/boards/', BoardView.as_view(), name='boards'),
     path('api/boards/<int:pk>/', BoardDetailView.as_view(), name='board-detail'), 
+    path('api/email-check/', EmailCheckView.as_view(), name='email-check'),
+
     path('api/tasks/', include('tasks_app.api.urls')), 
 ]

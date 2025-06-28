@@ -43,10 +43,7 @@ class CustomLoginView(APIView):
             password = request.data.get('password')
 
             if not email or not password:
-                return Response(
-                    {'detail': 'Ungültige Anfragedaten.'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response(status=status.HTTP_400_BAD_REQUEST)
 
             # Wir nutzen email als username, da du username=email speicherst
             user = authenticate(request, username=email, password=password)

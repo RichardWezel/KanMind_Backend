@@ -12,12 +12,15 @@ from rest_framework.views import APIView
 from .permissions import IsAuthenticatedWithCustomMessage, IsOwnerOrMemberOfBoard
 from rest_framework.exceptions import NotFound, ValidationError
 from auth_app.models import CustomUser
+from auth_app.api.serializers import UserSerializer  
 
+def internal_error_response_500(e):
+    return Response(
+        {"error": str(e)},
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+    )
 
-
-
-
-
+# This view handles the listing and creation of boards.
 class BoardView(ListCreateAPIView):
 
     serializer_class = BoardSerializer
@@ -30,49 +33,34 @@ class BoardView(ListCreateAPIView):
         ).distinct()
 
     def list(self, request, *args, **kwargs):
+     
+
         try:
             user = request.user
             if not user.is_authenticated:
-                return Response(
-                    {"detail": "Nicht autorisiert. Der Benutzer muss eingeloggt sein."},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
-
+                return Response(status=status.HTTP_401_UNAUTHORIZED)
             queryset = self.get_queryset()
-
             if not queryset.exists():
-                return Response(
-                    {"detail": "Du bist in keinem Board als Besitzer oder Mitglied eingetragen."},
-                    status=status.HTTP_200_OK
-                )
-
+                return Response(status=status.HTTP_200_OK)
+         
             serializer = self.get_serializer(queryset, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response(
-                {"detail": "Interner Serverfehler.", "error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return internal_error_response_500(e)
         
     def create(self, request, *args, **kwargs):
         try:
             user = request.user
             if not user.is_authenticated:
-                return Response(
-                    {"detail": "Nicht autorisiert. Der Benutzer muss eingeloggt sein."},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
+                return Response(status=status.HTTP_401_UNAUTHORIZED)
             
-
             serializer = BoardSerializer(data=request.data)
             if not serializer.is_valid():
-                return Response(serializer.errors,{'detail': 'Ungültige Anfragedaten.'},
-                     status=status.HTTP_400_BAD_REQUEST)
+                return Response(status=status.HTTP_400_BAD_REQUEST)
 
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-
             board = serializer.save(owner_id=user)
             board.members.add(user)
             board.member_count = board.members.count()
@@ -81,10 +69,7 @@ class BoardView(ListCreateAPIView):
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            return Response(
-                {"detail": "Interner Serverfehler.", "error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return internal_error_response_500(e)
         
 
 # This view handles the retrieval, update, and deletion of a specific board.
@@ -99,7 +84,6 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         if self.request.method == 'DELETE':
             return BoardUpdateSerializer
      
-
     def get_queryset(self):
         user = self.request.user
         try:
@@ -107,19 +91,15 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
                 models.Q(owner_id=user) | models.Q(members=user)
             ).distinct()
         except Board.DoesNotExist:
-            raise NotFound("Board nicht gefunden. Die angegebene Board-ID existiert nicht.") #404
-        
+            return Response(status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response(
-                {"detail": "Interner Serverfehler.", "error": str(e)}, #500
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return internal_error_response_500(e)
     
     def update(self, request, *args, **kwargs):
         request_members = self.request.data.get('members', [])
         valid_users = CustomUser.objects.filter(id__in=request_members)
         if valid_users.count() != len(request_members):
-            raise ValidationError("Ungültige Anfragedaten. Möglicherweise sind einige Benutzer ungültig.") #400
+            return Response(status=status.HTTP_400_BAD_REQUEST)
         
         try:
             partial = kwargs.pop('partial', False)
@@ -127,25 +107,12 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
             serializer = self.get_serializer(instance, data=request.data, partial=partial)
             serializer.is_valid(raise_exception=True)
             self.perform_update(serializer)
-
-            return Response(
-                {
-                    "detail": "Das Board wurde erfolgreich aktualisiert. Mitglieder wurden hinzugefügt und/oder entfernt.",
-                    "data": serializer.data
-                },
-                status=status.HTTP_200_OK
-            )
+            return Response({serializer.data},status=status.HTTP_200_OK)
         
         except NotFound:
-            return Response(
-                {"detail": "Board nicht gefunden. Die angegebene Board-ID existiert nicht."}, #404
-                status=status.HTTP_404_NOT_FOUND
-            )
+            return Response(status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response(
-                {"detail": "Interner Serverfehler.", "error": str(e)}, #500
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return internal_error_response_500(e)
         
     def perform_update(self, serializer):
         
@@ -157,13 +124,42 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         board.save()
 
 
+    def destroy(self, request, *args, **kwargs):
+        try:
+            user = request.user
+            instance = self.get_object()
+
+            if not user.is_authenticated:
+                return Response(status=status.HTTP_401_UNAUTHORIZED)
+            if instance.owner_id != user:
+                return Response(status=status.HTTP_403_FORBIDDEN)
+
+            self.perform_destroy(instance)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        except NotFound:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return internal_error_response_500(e)
+
     def perform_destroy(self, instance):
-        user = self.request.user
-
-        if instance.owner_id != user:
-            raise PermissionDenied("Nur der Besitzer darf das Board löschen.")
-
-        instance.delete()
+        instance.delete()  
 
 
+class EmailCheckView(APIView):
+    permission_classes = [IsAuthenticatedWithCustomMessage]
 
+    def get(self, request):
+        email = request.query_params.get("email")
+
+        if not email:
+            return Response({"detail": "E-Mail-Parameter fehlt."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = CustomUser.objects.get(email=email)
+            serializer = UserSerializer(user)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except CustomUser.DoesNotExist:
+            return Response({"detail": "Kein Benutzer mit dieser E-Mail gefunden."}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return internal_error_response_500(e)
