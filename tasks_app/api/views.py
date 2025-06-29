@@ -11,6 +11,15 @@ from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView
 from rest_framework import generics
+from rest_framework.exceptions import NotFound, ValidationError
+
+
+def internal_error_response_500(e):
+    return Response(
+        {"error": str(e)},
+        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+    )
+
 
 class TaskAssignedToMeView(ListCreateAPIView):
     http_method_names = ['get'] 
@@ -28,33 +37,22 @@ class TaskAssignedToMeView(ListCreateAPIView):
         try:
             user = request.user
             if not user.is_authenticated:
-                return Response(
-                    {"detail": "Nicht autorisiert. Der Benutzer muss eingeloggt sein, um auf diese Tasks zugreifen zu können."},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
+                return Response(status=status.HTTP_401_UNAUTHORIZED)
 
             queryset = self.get_queryset()
 
             if not queryset.exists():
-                return Response(
-                    {"detail": "Erfolgreich. Gibt eine Liste der Tasks zurück, bei denen der Benutzer als Prüfer (`reviewer`) eingetragen ist."},
-                    status=status.HTTP_200_OK
-                )
+                return Response(status=status.HTTP_200_OK)
 
             queryset = queryset.filter(assignee=user)
             if not queryset.exists():
-                return Response(
-                    {"detail": "Du bist in keiner Tasks als Prüfer (`reviewer`) eingetragen."},
-                    status=status.HTTP_200_OK
-                )
+                return Response(status=status.HTTP_200_OK)
+            
             serializer = self.get_serializer(queryset, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response(
-                {"detail": "Interner Serverfehler.", "error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return internal_error_response_500(e)
     
 class CreateTaskView(CreateAPIView):
     http_method_names = ['post'] 
@@ -66,15 +64,9 @@ class CreateTaskView(CreateAPIView):
         try:
             user = request.user
             if not user.is_authenticated:
-                return Response(
-                    {"detail": "Nicht autorisiert. Der Benutzer muss eingeloggt sein, um auf diese Tasks zugreifen zu können."},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
+                return Response(status=status.HTTP_401_UNAUTHORIZED)
             if not hasattr(request, 'data') or not request.data:
-                return Response(
-                    {"detail": "Ungültige Anfragedaten. Möglicherweise fehlen erforderliche Felder oder enthalten ungültige Werte."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+                return Response(status=status.HTTP_400_BAD_REQUEST)
 
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
@@ -85,10 +77,7 @@ class CreateTaskView(CreateAPIView):
                 status=status.HTTP_201_CREATED
             )
         except Exception as e:
-            return Response(
-                {"detail": "Interner Serverfehler.", "error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return internal_error_response_500(e)
     
 class TaskReviewingView(ListAPIView):
     http_method_names = ['get'] 
@@ -104,27 +93,18 @@ class TaskReviewingView(ListAPIView):
         try:
             user = request.user
             if not user.is_authenticated:
-                return Response(
-                    {"detail": "Nicht autorisiert. Der Benutzer muss eingeloggt sein, um auf diese Tasks zugreifen zu können."},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
+                return Response(status=status.HTTP_401_UNAUTHORIZED)
 
             queryset = self.get_queryset()
 
             if not queryset.exists():
-                return Response(
-                    {"detail": "Du hast keine Aufgaben in deinen Boards."},
-                    status=status.HTTP_200_OK
-                )
+                return Response(status=status.HTTP_200_OK)
 
             serializer = self.get_serializer(queryset, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
-            return Response(
-                {"detail": "Interner Serverfehler.", "error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return internal_error_response_500(e)
 
 class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsMemberOfBoard, IsAuthenticatedWithCustomMessage]
@@ -139,28 +119,18 @@ class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
         except Task.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
-            return Response(
-                {"detail": "Interner Serverfehler.", "error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return internal_error_response_500(e)
     
     def update(self, request, *args, **kwargs):
         try:
             user = request.user
             if not user.is_authenticated:
-                return Response(
-                    {"detail": "Nicht autorisiert. Der Benutzer muss eingeloggt sein, um auf diese Tasks zugreifen zu können."},
-                    status=status.HTTP_401_UNAUTHORIZED
-                )
+                return Response(status=status.HTTP_401_UNAUTHORIZED)
             instance = self.get_object()  # die Task
 
-            # 🔒 Prüfung: Ist der Benutzer Mitglied des Boards dieser Task?
             board = instance.board
             if user not in board.members.all() and user != board.owner_id:
-                return Response(
-                    {"detail": "Verboten. Du bist kein Mitglied dieses Boards."},
-                    status=status.HTTP_403_FORBIDDEN
-                )
+                return Response(status=status.HTTP_403_FORBIDDEN)
             
             partial = kwargs.pop('partial', False)
             serializer = self.get_serializer(instance, data=request.data, partial=partial)
@@ -170,9 +140,39 @@ class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
             return Response(response_data, status=status.HTTP_200_OK)
         
         except Exception as e:
-            return Response(
-                {"detail": "Interner Serverfehler.", "error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
+            return internal_error_response_500(e)
 
-      
+    def destroy(self, request, *args, **kwargs):
+        try:
+            user = request.user
+            instance = self.get_object()
+
+            pk = kwargs.get("pk")
+            try:
+                pk = int(pk)
+                if pk <= 0:
+                    raise ValueError()
+            except (TypeError, ValueError):
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            if not user.is_authenticated:
+                return Response(status=status.HTTP_401_UNAUTHORIZED)
+            
+            board = instance.board
+            if user not in board.members.all() and user != board.owner_id:
+                return Response(status=status.HTTP_403_FORBIDDEN)
+            
+            if instance.assignee != user:
+                return Response(status=status.HTTP_403_FORBIDDEN)
+            
+            if not instance:
+                return Response(status=status.HTTP_404_NOT_FOUND)
+            
+            self.perform_destroy(instance)
+            return Response(status=status.HTTP_204_NO_CONTENT)
+
+        except Exception as e:
+            return internal_error_response_500(e)
+
+    def perform_destroy(self, instance):
+        instance.delete()  

@@ -43,3 +43,17 @@ class Task(models.Model):
         verbose_name = "Task"
         verbose_name_plural = "Tasks"
         ordering = ['title'] 
+
+class TaskComment(models.Model):
+    id = models.AutoField(primary_key=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    author = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='task_comments')
+    content = models.TextField()
+
+    def __str__(self):
+        return self.content[:50]  
+
+    class Meta:
+        verbose_name = "Task-Comment"
+        verbose_name_plural = "Task-Comments"
+        ordering = ['created_at'] 
