@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from tasks_app.models import Task
+from tasks_app.models import Task, TaskComment
 from auth_app.api.serializers import UserSerializer
 from auth_app.models import CustomUser
 
@@ -96,5 +96,15 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
         instance.due_date = validated_data.get('due_date', instance.due_date)
         instance.save()
         return instance
+
+class TaskCommentSerializer(serializers.ModelSerializer):
+    author = serializers.SerializerMethodField()
+
+    class Meta:
+        model = TaskComment
+        fields = ['id', 'created_at', 'author', 'content']
+        read_only_fields = ['id', 'created_at', 'author']
     
-   
+    def get_author(self, obj):
+        return obj.author.fullname  
+    

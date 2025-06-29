@@ -1,4 +1,4 @@
-from tasks_app.api.serializers import TaskSerializer, TaskCreateSerializer, TaskUpdateSerializer
+from tasks_app.api.serializers import TaskSerializer, TaskCreateSerializer, TaskUpdateSerializer, TaskCommentSerializer
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import ListCreateAPIView
@@ -176,3 +176,52 @@ class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
 
     def perform_destroy(self, instance):
         instance.delete()  
+
+class TaskCommentsView(generics.ListAPIView):
+    serializer_class = TaskCommentSerializer
+    permission_classes = [IsAuthenticatedWithCustomMessage]
+
+    def get_queryset(self):
+        user = self.request.user
+        try:
+            return Task.objects.filter(
+                models.Q(assignee=user) | models.Q(reviewer=user)
+            ).distinct()
+        except Task.DoesNotExist:
+            raise NotFound("Task not found.")
+        except Exception as e:
+            return internal_error_response_500(e)
+        
+class TaskCreateCommentView(generics.ListCreateAPIView):
+    serializer_class = TaskCommentSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        task_id = self.kwargs.get('pk')
+        return Task.objects.filter(task__pk=task_id)
+    
+    def get(self, request, *args, **kwargs):
+        task_id = self.kwargs.get('pk')
+        try:
+            task = Task.objects.get(pk=task_id)
+        except Task.DoesNotExist:
+            raise NotFound("Task nicht gefunden.")
+        
+        comments = task.comments.all()
+        serializer = self.get_serializer(comments, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def perform_create(self, serializer):
+        task_id = self.kwargs.get('pk')
+
+        try:
+            task = Task.objects.get(pk=task_id)
+        except Task.DoesNotExist:
+            raise ValidationError({"detail": "Task nicht gefunden."})
+
+        # Kommentar speichern
+        comment = serializer.save(author=self.request.user, task=task)
+
+        # Kommentaranzahl aktualisieren
+        task.comments_count = task.comments.count()
+        task.save()

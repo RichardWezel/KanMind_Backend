@@ -49,6 +49,7 @@ class TaskComment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     author = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='task_comments')
     content = models.TextField()
+    task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments')
 
     def __str__(self):
         return self.content[:50]  
