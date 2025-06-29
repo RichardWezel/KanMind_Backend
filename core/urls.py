@@ -21,15 +21,10 @@ from boards_app.api.views import BoardView, BoardDetailView, EmailCheckView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-
     path('api/registration/', RegistrationView.as_view(), name='registration'),
     path('api/login/', CustomLoginView.as_view(), name='login'),
     path('api-auth/', include('rest_framework.urls', namespace='rest_framework')),
-
-
-    path('api/boards/', BoardView.as_view(), name='boards'),
-    path('api/boards/<int:pk>/', BoardDetailView.as_view(), name='board-detail'), 
+    path('api/boards/', include('boards_app.api.urls')),
     path('api/email-check/', EmailCheckView.as_view(), name='email-check'),
-
     path('api/tasks/', include('tasks_app.api.urls')), 
 ]

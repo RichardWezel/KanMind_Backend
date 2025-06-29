@@ -52,6 +52,14 @@ class TasksBoardDetailsSerializer(serializers.ModelSerializer):
 class TaskCreateSerializer(serializers.ModelSerializer):
     assignee_id = pk_field_for('assignee')
     reviewer_id = pk_field_for('reviewer')
+    status = serializers.ChoiceField(
+        choices=Task.STATUS_CHOICES,
+        default=Task.STATUS_TODO
+    )
+    priority = serializers.ChoiceField(
+        choices=Task.PRIORITY_CHOICES,
+        default=Task.PRIORITY_LOW
+    )
     
     class Meta:
         model = Task
@@ -63,3 +71,30 @@ class TaskCreateSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         return Task.objects.create(**validated_data)
+    
+
+class TaskUpdateSerializer(serializers.ModelSerializer):
+    assignee = user_field()
+    reviewer = user_field()
+    
+    class Meta:
+        model = Task
+        fields = [
+            'id', 'title', 'description', 'status', 
+            'priority', 'assignee', 'reviewer', 
+            'due_date'
+        ]
+        read_only_fields = ['id']
+    
+    def update(self, instance, validated_data):
+        instance.title = validated_data.get('title', instance.title)
+        instance.description = validated_data.get('description', instance.description)
+        instance.status = validated_data.get('status', instance.status)
+        instance.priority = validated_data.get('priority', instance.priority)
+        instance.assignee = validated_data.get('assignee_id', instance.assignee)
+        instance.reviewer = validated_data.get('reviewer_id', instance.reviewer)
+        instance.due_date = validated_data.get('due_date', instance.due_date)
+        instance.save()
+        return instance
+    
+   

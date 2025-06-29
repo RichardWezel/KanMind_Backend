@@ -1,4 +1,4 @@
-from tasks_app.api.serializers import TaskSerializer, TaskCreateSerializer
+from tasks_app.api.serializers import TaskSerializer, TaskCreateSerializer, TaskUpdateSerializer
 from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import ListCreateAPIView
@@ -10,6 +10,7 @@ from boards_app.models import Board
 from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView
+from rest_framework import generics
 
 class TaskAssignedToMeView(ListCreateAPIView):
     http_method_names = ['get'] 
@@ -124,4 +125,54 @@ class TaskReviewingView(ListAPIView):
                 {"detail": "Interner Serverfehler.", "error": str(e)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
+    permission_classes = [IsMemberOfBoard, IsAuthenticatedWithCustomMessage]
+    serializer_class = TaskUpdateSerializer
     
+    def get_queryset(self):
+        user = self.request.user
+        try:
+            return Task.objects.filter(
+                models.Q(assignee=user)
+            ).distinct()
+        except Task.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            return Response(
+                {"detail": "Interner Serverfehler.", "error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def update(self, request, *args, **kwargs):
+        try:
+            user = request.user
+            if not user.is_authenticated:
+                return Response(
+                    {"detail": "Nicht autorisiert. Der Benutzer muss eingeloggt sein, um auf diese Tasks zugreifen zu können."},
+                    status=status.HTTP_401_UNAUTHORIZED
+                )
+            instance = self.get_object()  # die Task
+
+            # 🔒 Prüfung: Ist der Benutzer Mitglied des Boards dieser Task?
+            board = instance.board
+            if user not in board.members.all() and user != board.owner_id:
+                return Response(
+                    {"detail": "Verboten. Du bist kein Mitglied dieses Boards."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            partial = kwargs.pop('partial', False)
+            serializer = self.get_serializer(instance, data=request.data, partial=partial)
+            serializer.is_valid(raise_exception=True)
+            task = serializer.save()
+            response_data = TaskUpdateSerializer(task).data 
+            return Response(response_data, status=status.HTTP_200_OK)
+        
+        except Exception as e:
+            return Response(
+                {"detail": "Interner Serverfehler.", "error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+      
