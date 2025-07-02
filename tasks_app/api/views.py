@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.generics import ListCreateAPIView
 from boards_app.api.permissions import IsAuthenticatedWithCustomMessage
-from tasks_app.models import Task
+from tasks_app.models import Task, TaskComment
 from django.db import models
 from .permissions import IsMemberOfBoard
 from boards_app.models import Board
@@ -12,6 +12,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView
 from rest_framework import generics
 from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.response import Response
+from rest_framework.views import APIView
+
+
 
 
 def internal_error_response_500(e):
@@ -20,6 +24,19 @@ def internal_error_response_500(e):
         status=status.HTTP_500_INTERNAL_SERVER_ERROR
     )
 
+# Validate the primary key of a task
+def validate_pk_task(task_id):
+    try:
+        task = Task.objects.get(pk=task_id)
+        return task
+    except Task.DoesNotExist:
+         Response(status=status.HTTP_404_NOT_FOUND)
+
+def validate_comment_in_task(comment_id, task):
+    try:
+        comment = task.comments.get(pk=comment_id)
+    except TaskComment.DoesNotExist:
+            Response(status=status.HTTP_404_NOT_FOUND)
 
 class TaskAssignedToMeView(ListCreateAPIView):
     http_method_names = ['get'] 
@@ -191,37 +208,66 @@ class TaskCommentsView(generics.ListAPIView):
             raise NotFound("Task not found.")
         except Exception as e:
             return internal_error_response_500(e)
-        
+
+# View to list comments for a specific task
 class TaskCreateCommentView(generics.ListCreateAPIView):
     serializer_class = TaskCommentSerializer
     permission_classes = [IsAuthenticated]
 
+    # Get the queryset for comments related to a specific task
+    # This is used to filter comments by task ID
     def get_queryset(self):
         task_id = self.kwargs.get('pk')
         return Task.objects.filter(task__pk=task_id)
     
+    # Retrieve comments for a specific task
     def get(self, request, *args, **kwargs):
         task_id = self.kwargs.get('pk')
-        try:
-            task = Task.objects.get(pk=task_id)
-        except Task.DoesNotExist:
-            raise NotFound("Task nicht gefunden.")
-        
+        task = validate_pk_task(task_id)
         comments = task.comments.all()
         serializer = self.get_serializer(comments, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
+    # Perform the creation of a comment
     def perform_create(self, serializer):
         task_id = self.kwargs.get('pk')
+        task = validate_pk_task(task_id)
 
-        try:
-            task = Task.objects.get(pk=task_id)
-        except Task.DoesNotExist:
-            raise ValidationError({"detail": "Task nicht gefunden."})
-
-        # Kommentar speichern
+        # saves comment with the current user and task
         comment = serializer.save(author=self.request.user, task=task)
 
-        # Kommentaranzahl aktualisieren
+        # update comment count for the task
+        task.comments_count = task.comments.count()
+        task.save()
+
+# View to delete a specific comment from a task
+class TaskDeleteCommentView(generics.DestroyAPIView):
+    serializer_class = TaskCommentSerializer
+    permission_classes = [IsAuthenticated]
+
+    # Retrieve the comment object based on task_id and comment_id
+    def get_object(self):
+        task_id = self.kwargs.get('task_id')
+        comment_id = self.kwargs.get('comment_id')
+
+        # Validate task_id and comment_id
+        if not task_id:
+            Response(status=status.HTTP_400_BAD_REQUEST)
+        if not comment_id:
+            Response(status=status.HTTP_400_BAD_REQUEST)
+
+        # Check if the task exists
+        task = validate_pk_task(task_id)
+
+        # Check if the comment exists for the task
+        comment = validate_comment_in_task(comment_id, task)
+        return comment
+
+    # Delete the comment and update the task's comment count
+    def perform_destroy(self, instance):
+        task = instance.task
+        instance.delete()
+
+        # update comment count for the task
         task.comments_count = task.comments.count()
         task.save()
