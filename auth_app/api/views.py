@@ -15,9 +15,8 @@ class RegistrationView(APIView):
         try:
             serializer = RegistrationSerializer(data=request.data)
             if not serializer.is_valid():
-                return Response(serializer.errors,{'detail': 'Ungültige Anfragedaten.'},
+                return Response(serializer.errors,
                      status=status.HTTP_400_BAD_REQUEST)
-            
             user = serializer.save()
             token, created = Token.objects.get_or_create(user=user)
             data = {
