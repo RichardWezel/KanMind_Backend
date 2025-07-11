@@ -14,6 +14,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from auth_app.models import CustomUser
 from auth_app.api.serializers import UserSerializer  
 from django.shortcuts import get_object_or_404
+from django.http import Http404
 
 def internal_error_response_500(e):
     return Response(
@@ -75,7 +76,7 @@ class BoardView(ListCreateAPIView):
 
 # This view handles the retrieval, update, and deletion of a specific board.
 class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAuthenticatedWithCustomMessage, IsOwnerOrMemberOfBoard] #401, 403
+    permission_classes = [IsAuthenticatedWithCustomMessage] #401
 
     def get_serializer_class(self):
         if self.request.method == 'GET':
@@ -96,23 +97,33 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         
     def update(self, request, *args, **kwargs):
-        request_members = self.request.data.get('members', [])
-        valid_users = CustomUser.objects.filter(id__in=request_members)
-        if valid_users.count() != len(request_members):
-            return Response(status=status.HTTP_400_BAD_REQUEST)
-        
         try:
             partial = kwargs.pop('partial', False)
+    
+            # ZUERST: Zugriffsschutz mit get_object (liefert 403 oder 404)
             instance = self.get_object()
+    
+            # DANN: Validierung der Mitglieder
+            request_members = self.request.data.get('members', [])
+            valid_users = CustomUser.objects.filter(id__in=request_members)
+            if valid_users.count() != len(request_members):
+                return Response(status=status.HTTP_400_BAD_REQUEST)
+    
+            # Danach PATCH mit Instanz
             serializer = self.get_serializer(instance, data=request.data, partial=partial)
             serializer.is_valid(raise_exception=True)
             self.perform_update(serializer)
-            return Response(serializer.data,status=status.HTTP_200_OK)
-        
-        except NotFound:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+            return Response(serializer.data, status=status.HTTP_200_OK)
+    
+        except PermissionDenied as e:
+            return Response({'detail': str(e)}, status=status.HTTP_403_FORBIDDEN)
+    
+        except Http404:
+            return Response({'detail': 'Board wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
+    
         except Exception as e:
             return internal_error_response_500(e)
+
         
     def perform_update(self, serializer):
         
