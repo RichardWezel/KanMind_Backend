@@ -37,17 +37,25 @@ class CustomLoginView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, *args, **kwargs):
-        try:
+   
             email = request.data.get('email')
             password = request.data.get('password')
 
             if not email or not password:
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+                return Response(
+                    {"detail": "E-Mail und Passwort sind erforderlich."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            try:
+                user = authenticate(request, username=email, password=password)
 
-            # Wir nutzen email als username, da du username=email speicherst
-            user = authenticate(request, username=email, password=password)
+                if user is None:
+                    return Response(
+                    {"detail": "E-Mail oder Passwort ist falsch."},
+                    status=status.HTTP_400_BAD_REQUEST  # Hier 400 statt 401
+                )
 
-            if user is not None:
                 token, created = Token.objects.get_or_create(user=user)
                 return Response({
                     'token': token.key,
@@ -55,13 +63,9 @@ class CustomLoginView(APIView):
                     'email': user.email,
                     'user_id': user.id,
                 }, status=status.HTTP_200_OK)
-            else:
+            
+            except Exception as e:
                 return Response(
-                    {'detail': 'Ungültige Anmeldedaten.'},
-                    status=status.HTTP_401_UNAUTHORIZED
+                    {'detail': 'Interner Serverfehler.'},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
-        except Exception as e:
-            return Response(
-                {'detail': 'Interner Serverfehler.'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
