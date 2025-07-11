@@ -35,5 +35,3 @@ class UserSerializer(serializers.ModelSerializer):
         model = CustomUser
         fields = ['id', 'email', 'fullname']
         read_only_fields = ['id']
-
-
