@@ -15,6 +15,9 @@ from auth_app.models import CustomUser
 from auth_app.api.serializers import UserSerializer  
 from django.shortcuts import get_object_or_404
 from django.http import Http404
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
+
 
 def internal_error_response_500(e):
     return Response(
@@ -81,10 +84,7 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
     def get_serializer_class(self):
         if self.request.method == 'GET':
             return BoardDetailSerializer
-        if self.request.method in ['PUT', 'PATCH']:
-            return BoardUpdateSerializer
-        if self.request.method == 'DELETE':
-            return BoardUpdateSerializer
+        return BoardUpdateSerializer
      
     def get_object(self):
         board = get_object_or_404(Board, pk=self.kwargs.get('pk'))
@@ -99,28 +99,28 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
     def update(self, request, *args, **kwargs):
         try:
             partial = kwargs.pop('partial', False)
-    
+
             # ZUERST: Zugriffsschutz mit get_object (liefert 403 oder 404)
             instance = self.get_object()
-    
+
             # DANN: Validierung der Mitglieder
             request_members = self.request.data.get('members', [])
             valid_users = CustomUser.objects.filter(id__in=request_members)
             if valid_users.count() != len(request_members):
                 return Response(status=status.HTTP_400_BAD_REQUEST)
-    
+
             # Danach PATCH mit Instanz
             serializer = self.get_serializer(instance, data=request.data, partial=partial)
             serializer.is_valid(raise_exception=True)
             self.perform_update(serializer)
             return Response(serializer.data, status=status.HTTP_200_OK)
-    
+
         except PermissionDenied as e:
             return Response({'detail': str(e)}, status=status.HTTP_403_FORBIDDEN)
-    
+
         except Http404:
             return Response({'detail': 'Board wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
-    
+
         except Exception as e:
             return internal_error_response_500(e)
 
@@ -137,21 +137,20 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
         try:
-            user = request.user
-            instance = self.get_object()
+            board = self.get_object()  # Zugriff geprüft
 
-            if not user.is_authenticated:
-                return Response(status=status.HTTP_401_UNAUTHORIZED)
-            if instance.owner_id != user:
-                return Response(status=status.HTTP_403_FORBIDDEN)
+            if board.owner_id != request.user:
+                raise PermissionDenied("Nur der Eigentümer darf das Board löschen.")
 
-            self.perform_destroy(instance)
+            self.perform_destroy(board)
             return Response(status=status.HTTP_204_NO_CONTENT)
 
-        except NotFound:
-            return Response(status=status.HTTP_404_NOT_FOUND)
+        except Http404:
+            return Response({"detail": "Board wurde nicht gefunden."}, status=status.HTTP_404_NOT_FOUND)
+        except PermissionDenied as e:
+            return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
         except Exception as e:
-            return internal_error_response_500(e)
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def perform_destroy(self, instance):
         instance.delete()  
@@ -166,6 +165,14 @@ class EmailCheckView(APIView):
         if not email:
             return Response({"detail": "E-Mail-Parameter fehlt."}, status=status.HTTP_400_BAD_REQUEST)
 
+        # ➕ Format validieren
+        try:
+            validate_email(email)
+        except ValidationError:
+            return Response(
+                {"detail": "Ungültige Anfrage. Die E-Mail-Adresse hat ein ungültiges Format."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
         try:
             user = CustomUser.objects.get(email=email)
             serializer = UserSerializer(user)
