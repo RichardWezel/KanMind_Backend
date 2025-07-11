@@ -13,6 +13,7 @@ from .permissions import IsAuthenticatedWithCustomMessage, IsOwnerOrMemberOfBoar
 from rest_framework.exceptions import NotFound, ValidationError
 from auth_app.models import CustomUser
 from auth_app.api.serializers import UserSerializer  
+from django.shortcuts import get_object_or_404
 
 def internal_error_response_500(e):
     return Response(
@@ -84,17 +85,16 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         if self.request.method == 'DELETE':
             return BoardUpdateSerializer
      
-    def get_queryset(self):
+    def get_object(self):
+        board = get_object_or_404(Board, pk=self.kwargs.get('pk'))
         user = self.request.user
-        try:
-            return Board.objects.filter(
-                models.Q(owner_id=user) | models.Q(members=user)
-            ).distinct()
-        except Board.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return internal_error_response_500(e)
     
+        if board.owner_id != user and not board.members.filter(id=user.id).exists():
+            raise PermissionDenied("Du hast keinen Zugriff auf dieses Board.")
+    
+        return board
+
+        
     def update(self, request, *args, **kwargs):
         request_members = self.request.data.get('members', [])
         valid_users = CustomUser.objects.filter(id__in=request_members)
