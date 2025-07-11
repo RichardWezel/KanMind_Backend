@@ -30,7 +30,7 @@ class BoardView(ListCreateAPIView):
         user = self.request.user
         return Board.objects.filter(
             models.Q(owner_id=user) | models.Q(members=user)
-        ).distinct()
+        ).distinct().order_by('id')
 
     def list(self, request, *args, **kwargs):
      
