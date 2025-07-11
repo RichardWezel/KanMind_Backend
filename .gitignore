@@ -1,5 +1,9 @@
 # Datenbank
 db.sqlite3
 
+# Python Bytecode-Dateien
 __pycache__/
 *.pyc
+
+# Mac-spezifisch
+.DS_Store
