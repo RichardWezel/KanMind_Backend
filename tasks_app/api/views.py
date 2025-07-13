@@ -15,9 +15,6 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-
-
-
 def internal_error_response_500(e):
     return Response(
         {"error": str(e)},
@@ -51,6 +48,7 @@ class TaskAssignedToMeView(ListCreateAPIView):
         ).distinct()
 
     def list(self, request, *args, **kwargs):
+
         try:
             user = request.user
             if not user.is_authenticated:
@@ -75,15 +73,26 @@ class CreateTaskView(CreateAPIView):
     http_method_names = ['post'] 
 
     serializer_class = TaskCreateSerializer
-    permission_classes = [IsMemberOfBoard, IsAuthenticatedWithCustomMessage, IsAuthenticated] 
-
+    permission_classes = [IsAuthenticatedWithCustomMessage, IsAuthenticated, IsMemberOfBoard] 
+ 
     def post(self, request, *args, **kwargs):
         try:
             user = request.user
             if not user.is_authenticated:
                 return Response(status=status.HTTP_401_UNAUTHORIZED)
-            if not hasattr(request, 'data') or not request.data:
+            
+            if not request.data:
                 return Response(status=status.HTTP_400_BAD_REQUEST)
+
+            board_id = request.data.get('board')
+            if not board_id or not Board.objects.filter(id=board_id).exists():
+                return Response(status=status.HTTP_404_NOT_FOUND)
+            
+            if request.data.get('assignee_id') == "":
+                request.data['assignee_id'] = None
+
+            if request.data.get('reviewer_id') == "":
+                request.data['reviewer_id'] = None
 
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
@@ -93,6 +102,9 @@ class CreateTaskView(CreateAPIView):
                 response_data,
                 status=status.HTTP_201_CREATED
             )
+        except ValidationError:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+
         except Exception as e:
             return internal_error_response_500(e)
     

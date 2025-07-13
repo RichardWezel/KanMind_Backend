@@ -3,6 +3,12 @@ from rest_framework.exceptions import PermissionDenied as Forbidden
 
 
 from rest_framework.permissions import BasePermission
+from rest_framework.exceptions import PermissionDenied, NotFound
+from tasks_app.models import Task
+from boards_app.models import Board
+
+
+from rest_framework.permissions import BasePermission
 from rest_framework.exceptions import PermissionDenied
 from tasks_app.models import Task
 from boards_app.models import Board
@@ -10,39 +16,29 @@ from boards_app.models import Board
 
 class IsMemberOfBoard(BasePermission):
     """
-    Erlaubt Zugriff nur für Mitglieder des Boards – entweder über direkte board-ID (POST)
-    oder über die Task-Instanz (PUT/PATCH).
+    Erlaubt Zugriff nur für Mitglieder oder Owner des Boards.
     """
 
     def has_permission(self, request, view):
         user = request.user
+        if not user.is_authenticated:
+            raise PermissionDenied("Du musst angemeldet sein, um auf diese Ressource zuzugreifen.")
 
-        # 🔁 Bei POST: Board-ID muss im Body sein
-        if request.method == 'POST':
-            board_id = request.data.get('board')
-            if not board_id:
-                raise PermissionDenied("Board-ID fehlt.")
+        board_id = view.kwargs.get('board_id') or request.data.get('board')
 
-            try:
-                board = Board.objects.get(id=board_id)
-            except Board.DoesNotExist:
-                raise PermissionDenied("Board existiert nicht.")
+        if not board_id:
+            raise PermissionDenied("Board-ID fehlt.")
 
-        # 🛠 Bei PUT/PATCH/DELETE: Board über Task-Objekt holen
-        elif request.method in ['PUT', 'PATCH', 'DELETE']:
-            try:
-                task = view.get_object()
-                board = task.board
-            except Task.DoesNotExist:
-                raise PermissionDenied("Task existiert nicht.")
-            except Exception:
-                raise PermissionDenied("Zugriff verweigert.")
+        try:
+            board = Board.objects.get(id=board_id)
+        except Board.DoesNotExist:
+            raise NotFound("Board existiert nicht.")
 
-        else:
-            return True  # GET etc.
-
-        if user not in board.members.all() and user != board.owner_id:
+        owner = board.owner_id  
+        if user not in board.members.all() and user != owner:
             raise PermissionDenied("Du bist kein Mitglied dieses Boards.")
 
         return True
+        
+
 

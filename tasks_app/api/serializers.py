@@ -14,7 +14,9 @@ def pk_field_for(source_name):
     return serializers.PrimaryKeyRelatedField(
         queryset=CustomUser.objects.all(),
         source=source_name,
-        write_only=True
+        write_only=True,
+        required=False,       
+        allow_null=True   
     )
 
 

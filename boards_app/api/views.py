@@ -18,7 +18,6 @@ from django.http import Http404
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 
-
 def internal_error_response_500(e):
     return Response(
         {"error": str(e)},
@@ -39,12 +38,13 @@ class BoardView(ListCreateAPIView):
 
     def list(self, request, *args, **kwargs):
      
-
         try:
             user = request.user
             if not user.is_authenticated:
                 return Response(status=status.HTTP_401_UNAUTHORIZED)
+            
             queryset = self.get_queryset()
+            
             if not queryset.exists():
                 return Response(status=status.HTTP_200_OK)
          
