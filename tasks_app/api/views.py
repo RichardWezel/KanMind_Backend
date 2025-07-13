@@ -5,7 +5,7 @@ from rest_framework.generics import ListCreateAPIView
 from boards_app.api.permissions import IsAuthenticatedWithCustomMessage
 from tasks_app.models import Task, TaskComment
 from django.db import models
-from .permissions import IsMemberOfBoard
+from .permissions import IsMemberOfBoard, IsMemberOfBoardComments
 from boards_app.models import Board
 from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -25,16 +25,16 @@ def internal_error_response_500(e):
 # Validate the primary key of a task
 def validate_pk_task(task_id):
     try:
-        task = Task.objects.get(pk=task_id)
-        return task
+        return Task.objects.get(pk=task_id)
     except Task.DoesNotExist:
-         Response(status=status.HTTP_404_NOT_FOUND)
+        raise NotFound("Die angegebene Task existiert nicht.")
 
 def validate_comment_in_task(comment_id, task):
     try:
         comment = task.comments.get(pk=comment_id)
     except TaskComment.DoesNotExist:
             Response(status=status.HTTP_404_NOT_FOUND)
+
 
 class TaskAssignedToMeView(ListCreateAPIView):
     http_method_names = ['get'] 
@@ -70,6 +70,7 @@ class TaskAssignedToMeView(ListCreateAPIView):
         except Exception as e:
             return internal_error_response_500(e)
     
+
 class CreateTaskView(CreateAPIView):
     http_method_names = ['post'] 
 
@@ -109,6 +110,7 @@ class CreateTaskView(CreateAPIView):
         except Exception as e:
             return internal_error_response_500(e)
     
+
 class TaskReviewingView(ListAPIView):
     http_method_names = ['get'] 
 
@@ -136,6 +138,7 @@ class TaskReviewingView(ListAPIView):
         except Exception as e:
             return internal_error_response_500(e)
 
+
 class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
     permission_classes = [IsAuthenticatedWithCustomMessage, IsMemberOfBoard ]
     serializer_class = TaskUpdateSerializer
@@ -146,10 +149,7 @@ class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
     def update(self, request, *args, **kwargs):
         try:
             partial = kwargs.pop('partial', False)
-
-            # ZUERST: Zugriffsschutz mit get_object (liefert 403 oder 404)
             instance = self.get_object()
-
             serializer = self.get_serializer(instance, data=request.data, partial=partial)
             serializer.is_valid(raise_exception=True)
             task = serializer.save()
@@ -203,6 +203,7 @@ class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
     def perform_destroy(self, instance):
         instance.delete()  
 
+
 class TaskCommentsView(generics.ListAPIView):
     serializer_class = TaskCommentSerializer
     permission_classes = [IsAuthenticatedWithCustomMessage]
@@ -218,10 +219,11 @@ class TaskCommentsView(generics.ListAPIView):
         except Exception as e:
             return internal_error_response_500(e)
 
+
 # View to list comments for a specific task
 class TaskCreateCommentView(generics.ListCreateAPIView):
     serializer_class = TaskCommentSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsMemberOfBoardComments]
 
     # Get the queryset for comments related to a specific task
     # This is used to filter comments by task ID
@@ -237,17 +239,35 @@ class TaskCreateCommentView(generics.ListCreateAPIView):
         serializer = self.get_serializer(comments, many=True)
         return Response(serializer.data, status=status.HTTP_200_OK)
 
-    # Perform the creation of a comment
-    def perform_create(self, serializer):
-        task_id = self.kwargs.get('pk')
-        task = validate_pk_task(task_id)
+    def create(self, request, *args, **kwargs):
+        try:
+            user = self.request.user
+            if not user.is_authenticated:
+                raise PermissionDenied("Du musst angemeldet sein.")
 
-        # saves comment with the current user and task
-        comment = serializer.save(author=self.request.user, task=task)
+            task_id = self.kwargs.get('pk')
 
-        # update comment count for the task
-        task.comments_count = task.comments.count()
-        task.save()
+            # Hier kann NotFound ausgelöst werden!
+            task = validate_pk_task(task_id)
+
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
+
+            comment = serializer.save(author=user, task=task)
+
+            task.comments_count = task.comments.count()
+            task.save()
+
+            return Response(self.get_serializer(comment).data, status=status.HTTP_201_CREATED)
+
+        except NotFound as nf:
+            return Response({"detail": str(nf)}, status=status.HTTP_404_NOT_FOUND)
+
+        except ValidationError as ve:
+            return Response({"detail": ve.detail}, status=status.HTTP_400_BAD_REQUEST)
+
+        except Exception as e:
+            return internal_error_response_500(e)
 
 # View to delete a specific comment from a task
 class TaskDeleteCommentView(generics.DestroyAPIView):
@@ -259,17 +279,15 @@ class TaskDeleteCommentView(generics.DestroyAPIView):
         task_id = self.kwargs.get('task_id')
         comment_id = self.kwargs.get('comment_id')
 
-        # Validate task_id and comment_id
-        if not task_id:
-            Response(status=status.HTTP_400_BAD_REQUEST)
-        if not comment_id:
-            Response(status=status.HTTP_400_BAD_REQUEST)
+        if not task_id or not comment_id:
+            raise NotFound("Task-ID oder Comment-ID fehlt oder ist ungültig.")
 
-        # Check if the task exists
         task = validate_pk_task(task_id)
 
-        # Check if the comment exists for the task
         comment = validate_comment_in_task(comment_id, task)
+        if not comment:
+            raise NotFound("Kommentar nicht gefunden.")
+
         return comment
 
     # Delete the comment and update the task's comment count

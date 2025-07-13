@@ -18,9 +18,10 @@ class IsMemberOfBoard(BasePermission):
 
         # Nur bei POST nötig – da haben wir noch kein Objekt
         if request.method == "POST":
+
             board_id = view.kwargs.get('board_id') or request.data.get('board')
             if not board_id:
-                raise PermissionDenied("Board-ID fehlt.")
+                raise PermissionDenied("Du bist nicht Mitglied des Boards.")
 
             try:
                 board = Board.objects.get(id=board_id)
@@ -42,5 +43,38 @@ class IsMemberOfBoard(BasePermission):
 
         return True
         
+class IsMemberOfBoardComments(BasePermission):
+    """
+    Erlaubt Zugriff nur für Mitglieder oder Owner des Boards.
+    """
 
+    def has_permission(self, request, view):
+        user = request.user
+        if not user.is_authenticated:
+            raise PermissionDenied("Du musst angemeldet sein.")
+
+        task_id = view.kwargs.get("pk")  # wird aus der URL geholt
+        if not task_id:
+            raise PermissionDenied("Task-ID fehlt.")
+
+        try:
+            task = Task.objects.select_related("board").get(id=task_id)
+        except Task.DoesNotExist:
+            raise NotFound("Task existiert nicht.")
+
+        board = task.board
+        if user not in board.members.all() and user.id != board.owner_id:
+            raise PermissionDenied("Du bist kein Mitglied dieses Boards.")
+
+        return True
+    
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        owner = obj.board.owner_id
+        # Zugriff auf das Task-Objekt → Board
+        board = obj.board
+        if user not in board.members.all() and user.id != board.owner_id:
+            raise PermissionDenied("Du bist kein Mitglied dieses Boards.")
+
+        return True
 
