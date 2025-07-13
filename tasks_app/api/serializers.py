@@ -76,6 +76,20 @@ class TaskCreateSerializer(serializers.ModelSerializer):
     
 
 class TaskUpdateSerializer(serializers.ModelSerializer):
+    assignee_id = serializers.PrimaryKeyRelatedField(
+        queryset=CustomUser.objects.all(),
+        source='assignee',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
+    reviewer_id = serializers.PrimaryKeyRelatedField(
+        queryset=CustomUser.objects.all(),
+        source='reviewer',
+        write_only=True,
+        required=False,
+        allow_null=True
+    )
     assignee = user_field()
     reviewer = user_field()
     
@@ -83,7 +97,8 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
         model = Task
         fields = [
             'id', 'title', 'description', 'status', 
-            'priority', 'assignee', 'reviewer', 
+            'priority', 'assignee', 'assignee_id',
+            'reviewer', 'reviewer_id',
             'due_date'
         ]
         read_only_fields = ['id']
@@ -93,8 +108,8 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
         instance.description = validated_data.get('description', instance.description)
         instance.status = validated_data.get('status', instance.status)
         instance.priority = validated_data.get('priority', instance.priority)
-        instance.assignee = validated_data.get('assignee_id', instance.assignee)
-        instance.reviewer = validated_data.get('reviewer_id', instance.reviewer)
+        instance.assignee = validated_data.get('assignee', instance.assignee)
+        instance.reviewer = validated_data.get('reviewer', instance.reviewer)
         instance.due_date = validated_data.get('due_date', instance.due_date)
         instance.save()
         return instance

@@ -11,9 +11,10 @@ from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.generics import ListAPIView
 from rest_framework import generics
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import NotFound, ValidationError, PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.http import Http404
 
 def internal_error_response_500(e):
     return Response(
@@ -136,37 +137,33 @@ class TaskReviewingView(ListAPIView):
             return internal_error_response_500(e)
 
 class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsMemberOfBoard, IsAuthenticatedWithCustomMessage]
+    permission_classes = [IsAuthenticatedWithCustomMessage, IsMemberOfBoard ]
     serializer_class = TaskUpdateSerializer
     
     def get_queryset(self):
-        user = self.request.user
-        try:
-            return Task.objects.filter(
-                models.Q(assignee=user)
-            ).distinct()
-        except Task.DoesNotExist:
-            return Response(status=status.HTTP_404_NOT_FOUND)
-        except Exception as e:
-            return internal_error_response_500(e)
+        return Task.objects.all()
     
     def update(self, request, *args, **kwargs):
         try:
-            user = request.user
-            if not user.is_authenticated:
-                return Response(status=status.HTTP_401_UNAUTHORIZED)
-            instance = self.get_object()  # die Task
-
-            board = instance.board
-            if user not in board.members.all() and user != board.owner_id:
-                return Response(status=status.HTTP_403_FORBIDDEN)
-            
             partial = kwargs.pop('partial', False)
+
+            # ZUERST: Zugriffsschutz mit get_object (liefert 403 oder 404)
+            instance = self.get_object()
+
             serializer = self.get_serializer(instance, data=request.data, partial=partial)
             serializer.is_valid(raise_exception=True)
             task = serializer.save()
             response_data = TaskUpdateSerializer(task).data 
             return Response(response_data, status=status.HTTP_200_OK)
+        
+        except ValidationError as ve:
+            return Response({"detail": ve.detail}, status=status.HTTP_400_BAD_REQUEST)
+        
+        except PermissionDenied as e:
+            return Response({'detail': str(e)}, status=status.HTTP_403_FORBIDDEN)
+
+        except Http404:
+            return Response(status=status.HTTP_404_NOT_FOUND)
         
         except Exception as e:
             return internal_error_response_500(e)
