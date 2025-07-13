@@ -3,8 +3,8 @@ from rest_framework.exceptions import NotAuthenticated, PermissionDenied
 
 class IsAuthenticatedWithCustomMessage(BasePermission):
     """
-    Erlaubt Zugriff nur für authentifizierte Benutzer.
-    Gibt bei Nichtauthentifizierung eine benutzerdefinierte 401-Meldung zurück.
+    Custom permission to only allow authenticated users.
+    If the user is not authenticated, it raises a NotAuthenticated error with a custom message.
     """
 
     def has_permission(self, request, view):
@@ -13,6 +13,10 @@ class IsAuthenticatedWithCustomMessage(BasePermission):
         return True
 
 class IsOwnerOrMemberOfBoard(BasePermission):
+    """
+    Custom permission to allow access only to the owner or members of a board.
+    If the user is not the owner or a member, it raises a PermissionDenied error.
+    """
     def has_object_permission(self, request, view, obj):
         user = request.user
 

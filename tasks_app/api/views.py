@@ -5,7 +5,7 @@ from rest_framework.generics import ListCreateAPIView
 from boards_app.api.permissions import IsAuthenticatedWithCustomMessage
 from tasks_app.models import Task, TaskComment
 from django.db import models
-from .permissions import IsMemberOfBoard, IsMemberOfBoardComments
+from .permissions import IsMemberOfBoard, IsMemberOfBoardComments, IsAuthorOfComment
 from boards_app.models import Board
 from rest_framework.generics import CreateAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -16,27 +16,30 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.http import Http404
 
+# This function handles internal server errors and returns a standardized response.
 def internal_error_response_500(e):
     return Response(
         {"error": str(e)},
         status=status.HTTP_500_INTERNAL_SERVER_ERROR
     )
 
-# Validate the primary key of a task
+# Validate the task ID and return the Task object or raise NotFound
 def validate_pk_task(task_id):
     try:
         return Task.objects.get(pk=task_id)
     except Task.DoesNotExist:
         raise NotFound("Die angegebene Task existiert nicht.")
 
+# Validate the comment ID in the context of a specific task
 def validate_comment_in_task(comment_id, task):
     try:
-        comment = task.comments.get(pk=comment_id)
+        return task.comments.get(pk=comment_id)
     except TaskComment.DoesNotExist:
-            Response(status=status.HTTP_404_NOT_FOUND)
+        raise NotFound("Kommentar nicht gefunden.")
 
 
 class TaskAssignedToMeView(ListCreateAPIView):
+    """This view lists all tasks assigned to the authenticated user."""
     http_method_names = ['get'] 
 
     serializer_class = TaskSerializer
@@ -72,6 +75,15 @@ class TaskAssignedToMeView(ListCreateAPIView):
     
 
 class CreateTaskView(CreateAPIView):
+    """
+    This view handles the creation of a new task.
+    It checks if the user is authenticated and a member of the board specified in the request.
+    If the user is not authenticated or not a member, it raises a PermissionDenied error.
+    The view expects the request data to contain a 'board' field, which is the ID
+    of the board to which the task will be assigned.
+    If the 'assignee_id' or 'reviewer_id' fields are empty, they
+    will be set to None.
+    """
     http_method_names = ['post'] 
 
     serializer_class = TaskCreateSerializer
@@ -112,6 +124,7 @@ class CreateTaskView(CreateAPIView):
     
 
 class TaskReviewingView(ListAPIView):
+    """This view lists all tasks that are currently under review by the user."""
     http_method_names = ['get'] 
 
     serializer_class = TaskSerializer
@@ -140,6 +153,7 @@ class TaskReviewingView(ListAPIView):
 
 
 class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
+    """"This view handles the update and deletion of a specific task."""
     permission_classes = [IsAuthenticatedWithCustomMessage, IsMemberOfBoard ]
     serializer_class = TaskUpdateSerializer
     
@@ -169,9 +183,26 @@ class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
             return internal_error_response_500(e)
 
     def destroy(self, request, *args, **kwargs):
+        """
+        Deletes a task instance if the requesting user is authorized.
+        This method performs the following steps:
+        - Checks if the user is authenticated.
+        - Validates the provided task ID (`pk`).
+        - Retrieves the task instance, handling cases where it does not exist or access is denied.
+        - Ensures that only the task assignee or the board owner can delete the task.
+        - Deletes the task instance if all checks pass.
+        Returns:
+            - 204 NO CONTENT on successful deletion.
+            - 400 BAD REQUEST if the task ID is invalid.
+            - 401 UNAUTHORIZED if the user is not authenticated.
+            - 403 FORBIDDEN if the user lacks permission.
+            - 404 NOT FOUND if the task does not exist.
+            - 500 INTERNAL SERVER ERROR for unexpected exceptions.
+        """
         try:
             user = request.user
-            instance = self.get_object()
+            if not user.is_authenticated:
+                return Response(status=status.HTTP_401_UNAUTHORIZED)
 
             pk = kwargs.get("pk")
             try:
@@ -179,21 +210,19 @@ class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
                 if pk <= 0:
                     raise ValueError()
             except (TypeError, ValueError):
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+                return Response({"detail": "Ungültige Task-ID."}, status=status.HTTP_400_BAD_REQUEST)
 
-            if not user.is_authenticated:
-                return Response(status=status.HTTP_401_UNAUTHORIZED)
-            
+            try:
+                instance = self.get_object()
+            except Http404:
+                return Response({"detail": "Task wurde nicht gefunden."}, status=status.HTTP_404_NOT_FOUND)
+            except PermissionDenied as e:
+                return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
             board = instance.board
-            if user not in board.members.all() and user != board.owner_id:
-                return Response(status=status.HTTP_403_FORBIDDEN)
-            
-            if instance.assignee != user:
-                return Response(status=status.HTTP_403_FORBIDDEN)
-            
-            if not instance:
-                return Response(status=status.HTTP_404_NOT_FOUND)
-            
+
+            if instance.assignee != user and board.owner_id != user.id:
+                return Response({"detail": "Nur der Ersteller oder Board-Eigentümer darf löschen."}, status=status.HTTP_403_FORBIDDEN)
+
             self.perform_destroy(instance)
             return Response(status=status.HTTP_204_NO_CONTENT)
 
@@ -220,18 +249,20 @@ class TaskCommentsView(generics.ListAPIView):
             return internal_error_response_500(e)
 
 
-# View to list comments for a specific task
 class TaskCreateCommentView(generics.ListCreateAPIView):
+    """
+    View to create comments for a specific task.
+    This view allows authenticated users to add comments to a task.
+    It checks if the user is a member of the board associated with the task.
+    If the user is not authenticated or not a member, it raises a PermissionDenied error.
+    """
     serializer_class = TaskCommentSerializer
     permission_classes = [IsAuthenticated, IsMemberOfBoardComments]
 
-    # Get the queryset for comments related to a specific task
-    # This is used to filter comments by task ID
     def get_queryset(self):
         task_id = self.kwargs.get('pk')
         return Task.objects.filter(task__pk=task_id)
     
-    # Retrieve comments for a specific task
     def get(self, request, *args, **kwargs):
         task_id = self.kwargs.get('pk')
         task = validate_pk_task(task_id)
@@ -246,15 +277,10 @@ class TaskCreateCommentView(generics.ListCreateAPIView):
                 raise PermissionDenied("Du musst angemeldet sein.")
 
             task_id = self.kwargs.get('pk')
-
-            # Hier kann NotFound ausgelöst werden!
             task = validate_pk_task(task_id)
-
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
-
             comment = serializer.save(author=user, task=task)
-
             task.comments_count = task.comments.count()
             task.save()
 
@@ -269,32 +295,34 @@ class TaskCreateCommentView(generics.ListCreateAPIView):
         except Exception as e:
             return internal_error_response_500(e)
 
-# View to delete a specific comment from a task
-class TaskDeleteCommentView(generics.DestroyAPIView):
-    serializer_class = TaskCommentSerializer
-    permission_classes = [IsAuthenticated]
 
-    # Retrieve the comment object based on task_id and comment_id
+class TaskDeleteCommentView(generics.DestroyAPIView):
+    """
+    View to delete a specific comment from a task.
+    This view allows authenticated users to delete comments they authored.
+    It checks if the user is a member of the board associated with the task and if they
+    are the author of the comment.
+    If the user is not authenticated, not a member, or not the author, it raises
+    PermissionDenied or NotFound errors.
+    """
+
+    serializer_class = TaskCommentSerializer
+    permission_classes = [IsAuthenticated,  IsMemberOfBoardComments, IsAuthorOfComment]
+
     def get_object(self):
         task_id = self.kwargs.get('task_id')
         comment_id = self.kwargs.get('comment_id')
-
         if not task_id or not comment_id:
             raise NotFound("Task-ID oder Comment-ID fehlt oder ist ungültig.")
-
         task = validate_pk_task(task_id)
-
         comment = validate_comment_in_task(comment_id, task)
         if not comment:
             raise NotFound("Kommentar nicht gefunden.")
-
+        self.check_object_permissions(self.request, comment)
         return comment
 
-    # Delete the comment and update the task's comment count
     def perform_destroy(self, instance):
         task = instance.task
         instance.delete()
-
-        # update comment count for the task
         task.comments_count = task.comments.count()
         task.save()

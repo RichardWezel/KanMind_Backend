@@ -8,7 +8,13 @@ from boards_app.models import Board
 
 class IsMemberOfBoard(BasePermission):
     """
-    Erlaubt Zugriff nur für Mitglieder oder Owner des Boards.
+    Permission class that allows access only to members or the owner of a board.
+    - For POST requests, checks if the user is authenticated and a member or owner of the specified board.
+    - For other methods, allows access by default.
+    - For object-level permissions, ensures the user is a member or owner of the board associated with the object.
+    Raises:
+        PermissionDenied: If the user is not authenticated, not a member, or not the owner.
+        NotFound: If the specified board does not exist.
     """
 
     def has_permission(self, request, view):
@@ -45,7 +51,12 @@ class IsMemberOfBoard(BasePermission):
         
 class IsMemberOfBoardComments(BasePermission):
     """
-    Erlaubt Zugriff nur für Mitglieder oder Owner des Boards.
+    Permission class that allows access to comments only for members or the owner of the board.
+    - Checks if the user is authenticated and a member or owner of the board associated with the
+    comment.
+    - Raises PermissionDenied if the user is not authenticated, not a member, or not the
+    owner of the board.
+    - Raises NotFound if the specified task does not exist.
     """
 
     def has_permission(self, request, view):
@@ -78,3 +89,14 @@ class IsMemberOfBoardComments(BasePermission):
 
         return True
 
+class IsAuthorOfComment(BasePermission):
+    """
+    Permission class that allows access to comments only for the author of the comment.
+    - Checks if the user is the author of the comment.
+    - Raises PermissionDenied if the user is not the author.
+    """
+
+    def has_object_permission(self, request, view, obj):
+        if request.user != obj.author:
+            raise PermissionDenied("Du darfst nur deine eigenen Kommentare löschen.")
+        return True

@@ -18,14 +18,23 @@ from django.http import Http404
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 
+# This function handles internal server errors and returns a standardized response.
 def internal_error_response_500(e):
     return Response(
         {"error": str(e)},
         status=status.HTTP_500_INTERNAL_SERVER_ERROR
     )
 
-# This view handles the listing and creation of boards.
+
 class BoardView(ListCreateAPIView):
+    """
+    This view handles the listing and creation of boards.
+    It checks if the user is authenticated and has permission to access the boards.
+    If the user is not authenticated, it raises a PermissionDenied error.
+    The view expects the request to contain a 'members' field, which is a list of
+    user IDs to be added as members of the board.
+    If the 'members' field is not provided, it will not add any members to the board.
+    """
 
     serializer_class = BoardSerializer
     permission_classes = [IsAuthenticatedWithCustomMessage] 
@@ -77,9 +86,18 @@ class BoardView(ListCreateAPIView):
             return internal_error_response_500(e)
         
 
-# This view handles the retrieval, update, and deletion of a specific board.
 class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
-    permission_classes = [IsAuthenticatedWithCustomMessage] #401
+    """
+    This view handles the retrieval, update, and deletion of a specific board.
+    It checks if the user is authenticated and has permission to access the board.
+    If the user is not authenticated or does not have permission, it raises a PermissionDenied error
+    or NotFound error.
+    The view expects the request to contain a 'members' field, which is a list of
+    user IDs to be added as members of the board.
+    If the 'members' field is not provided, it will not update the members of the
+    board, but will still allow the owner to update other fields.
+    """
+    permission_classes = [IsAuthenticatedWithCustomMessage] 
 
     def get_serializer_class(self):
         if self.request.method == 'GET':
@@ -99,17 +117,12 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
     def update(self, request, *args, **kwargs):
         try:
             partial = kwargs.pop('partial', False)
-
-            # ZUERST: Zugriffsschutz mit get_object (liefert 403 oder 404)
             instance = self.get_object()
-
-            # DANN: Validierung der Mitglieder
             request_members = self.request.data.get('members', [])
             valid_users = CustomUser.objects.filter(id__in=request_members)
             if valid_users.count() != len(request_members):
                 return Response(status=status.HTTP_400_BAD_REQUEST)
 
-            # Danach PATCH mit Instanz
             serializer = self.get_serializer(instance, data=request.data, partial=partial)
             serializer.is_valid(raise_exception=True)
             self.perform_update(serializer)
@@ -137,7 +150,7 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def destroy(self, request, *args, **kwargs):
         try:
-            board = self.get_object()  # Zugriff geprüft
+            board = self.get_object()
 
             if board.owner_id != request.user:
                 raise PermissionDenied("Nur der Eigentümer darf das Board löschen.")
@@ -157,6 +170,10 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 
 class EmailCheckView(APIView):
+    """
+    This view checks if a user with the given email exists.
+    It returns the user data if found, or a 404 error if not.
+    """
     permission_classes = [IsAuthenticatedWithCustomMessage]
 
     def get(self, request):
@@ -165,7 +182,6 @@ class EmailCheckView(APIView):
         if not email:
             return Response({"detail": "E-Mail-Parameter fehlt."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # ➕ Format validieren
         try:
             validate_email(email)
         except ValidationError:
