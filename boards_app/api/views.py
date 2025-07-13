@@ -1,22 +1,23 @@
-
-from boards_app.models import Board
-from rest_framework import generics
-from rest_framework.permissions import IsAuthenticated
-from .serializers import BoardSerializer, BoardDetailSerializer, BoardUpdateSerializer
+from django.shortcuts import get_object_or_404
+from django.http import Http404
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 from django.db import models
+
+from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework import generics, status
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
-from .permissions import IsAuthenticatedWithCustomMessage, IsOwnerOrMemberOfBoard
-from rest_framework.exceptions import NotFound, ValidationError
+from rest_framework.exceptions import ValidationError
+
 from auth_app.models import CustomUser
 from auth_app.api.serializers import UserSerializer  
-from django.shortcuts import get_object_or_404
-from django.http import Http404
-from django.core.validators import validate_email
-from django.core.exceptions import ValidationError
+from boards_app.models import Board
+from .serializers import BoardSerializer, BoardDetailSerializer, BoardUpdateSerializer
+from .permissions import IsAuthenticatedWithCustomMessage
+
 
 # This function handles internal server errors and returns a standardized response.
 def internal_error_response_500(e):
@@ -24,7 +25,6 @@ def internal_error_response_500(e):
         {"error": str(e)},
         status=status.HTTP_500_INTERNAL_SERVER_ERROR
     )
-
 
 class BoardView(ListCreateAPIView):
     """

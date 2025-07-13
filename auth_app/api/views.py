@@ -1,10 +1,10 @@
 from rest_framework import status, permissions
-from .serializers import RegistrationSerializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
-from django.contrib.auth import get_user_model
-from django.contrib.auth import authenticate
+from django.contrib.auth import authenticate, get_user_model
+
+from .serializers import RegistrationSerializer
 
 User = get_user_model()
 

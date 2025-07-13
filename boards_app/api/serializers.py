@@ -1,7 +1,8 @@
 from rest_framework import serializers
-from boards_app.models import Board
-from auth_app.models import CustomUser
+
 from auth_app.api.serializers import UserSerializer
+from auth_app.models import CustomUser
+from boards_app.models import Board
 from tasks_app.api.serializers import TasksBoardDetailsSerializer
 
 

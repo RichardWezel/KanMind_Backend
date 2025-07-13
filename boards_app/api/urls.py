@@ -1,4 +1,5 @@
 from django.urls import path
+
 from boards_app.api.views import BoardView, BoardDetailView
 
 urlpatterns = [

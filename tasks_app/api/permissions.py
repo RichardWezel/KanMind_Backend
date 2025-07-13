@@ -2,6 +2,7 @@ from rest_framework.permissions import BasePermission
 from rest_framework.exceptions import PermissionDenied as Forbidden
 from rest_framework.permissions import BasePermission
 from rest_framework.exceptions import PermissionDenied, NotFound
+
 from tasks_app.models import Task
 from boards_app.models import Board 
 

@@ -1,20 +1,21 @@
-from tasks_app.api.serializers import TaskSerializer, TaskCreateSerializer, TaskUpdateSerializer, TaskCommentSerializer
+from django.http import Http404
+from django.db import models
+
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.generics import ListCreateAPIView
-from boards_app.api.permissions import IsAuthenticatedWithCustomMessage
-from tasks_app.models import Task, TaskComment
-from django.db import models
-from .permissions import IsMemberOfBoard, IsMemberOfBoardComments, IsAuthorOfComment
-from boards_app.models import Board
-from rest_framework.generics import CreateAPIView
+from rest_framework.generics import ListCreateAPIView, CreateAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.generics import ListAPIView
 from rest_framework import generics
 from rest_framework.exceptions import NotFound, ValidationError, PermissionDenied
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from django.http import Http404
+
+from tasks_app.api.serializers import TaskSerializer, TaskCreateSerializer, TaskUpdateSerializer, TaskCommentSerializer
+from tasks_app.models import Task, TaskComment
+from boards_app.api.permissions import IsAuthenticatedWithCustomMessage
+from boards_app.models import Board
+from .permissions import IsMemberOfBoard, IsMemberOfBoardComments, IsAuthorOfComment
+
+
+
 
 # This function handles internal server errors and returns a standardized response.
 def internal_error_response_500(e):
