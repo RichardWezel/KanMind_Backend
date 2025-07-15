@@ -1,9 +1,21 @@
-# Datenbank
+# Database
 db.sqlite3
 
-# Python Bytecode-Dateien
+# Python bytecode
 __pycache__/
 *.pyc
 
-# Mac-spezifisch
+# macOS
 .DS_Store
+
+# Virtual environment
+env/
+venv/
+.venv/
+
+# VS Code settings
+.vscode/
+
+# Other
+*.log
+.env
