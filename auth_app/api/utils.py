@@ -2,7 +2,7 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 
-
+# Utility functions for authentication views
 def validate_login_data(data):
     email = data.get('email')
     password = data.get('password')
@@ -15,7 +15,7 @@ def validate_login_data(data):
     
     return email, password, None
 
-
+# Function to get user token response
 def get_user_token_response(user):
     try:
         token, created = Token.objects.get_or_create(user=user)
