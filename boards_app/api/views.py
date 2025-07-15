@@ -182,23 +182,32 @@ class EmailCheckView(APIView):
     permission_classes = [IsAuthenticatedWithCustomMessage]
 
     def get(self, request):
-        email = request.query_params.get("email")
+        email = request.query_params.get("email", "").strip()
 
         if not email:
-            return Response({"detail": "E-Mail-Parameter fehlt."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"detail": "E-Mail-Parameter fehlt."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         try:
             validate_email(email)
         except ValidationError:
             return Response(
-                {"detail": "Ungültige Anfrage. Die E-Mail-Adresse hat ein ungültiges Format."},
+                {"detail": "Ungültige E-Mail-Adresse."},
                 status=status.HTTP_400_BAD_REQUEST
             )
+        
         try:
             user = CustomUser.objects.get(email=email)
             serializer = UserSerializer(user)
             return Response(serializer.data, status=status.HTTP_200_OK)
+        
         except CustomUser.DoesNotExist:
-            return Response({"detail": "Kein Benutzer mit dieser E-Mail gefunden."}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "Kein Benutzer mit dieser E-Mail gefunden."}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
         except Exception as e:
             return internal_error_response_500(e)
