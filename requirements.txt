@@ -1,4 +1,7 @@
 asgiref==3.8.1
 Django==5.2.3
 djangorestframework==3.16.0
+dnspython==2.7.0
+email_validator==2.2.0
+idna==3.10
 sqlparse==0.5.3

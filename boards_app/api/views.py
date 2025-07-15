@@ -3,6 +3,7 @@ from django.http import Http404
 from django.core.validators import validate_email
 from django.core.exceptions import ValidationError
 from django.db import models
+from email_validator import validate_email, EmailNotValidError
 
 from rest_framework import generics
 from rest_framework.response import Response
@@ -192,10 +193,10 @@ class EmailCheckView(APIView):
 
         try:
             validate_email(email)
-        except ValidationError:
+        except EmailNotValidError:
             return Response(
-                {"detail": "Ungültige E-Mail-Adresse."},
-                status=status.HTTP_400_BAD_REQUEST
+                {"detail": "Ungültige E-Mail-Adresse."}, 
+                status=400
             )
         
         try:
