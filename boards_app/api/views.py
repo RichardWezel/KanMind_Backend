@@ -40,12 +40,14 @@ class BoardView(ListCreateAPIView):
     serializer_class = BoardSerializer
     permission_classes = [IsAuthenticatedWithCustomMessage] 
 
+    # Retrieves the queryset of boards for the authenticated user.
     def get_queryset(self):
         user = self.request.user
         return Board.objects.filter(
             models.Q(owner_id=user) | models.Q(members=user)
         ).distinct().order_by('id')
 
+    # Lists all boards for the authenticated user.
     def list(self, request, *args, **kwargs):
      
         try:
@@ -63,7 +65,8 @@ class BoardView(ListCreateAPIView):
 
         except Exception as e:
             return internal_error_response_500(e)
-        
+    
+    # Creates a new board for the authenticated user.
     def create(self, request, *args, **kwargs):
         try:
             user = request.user
@@ -100,11 +103,13 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     permission_classes = [IsAuthenticatedWithCustomMessage] 
 
+    # Retrieves the board object based on the primary key (pk) provided in the URL.
     def get_serializer_class(self):
         if self.request.method == 'GET':
             return BoardDetailSerializer
         return BoardUpdateSerializer
-     
+    
+    # Retrieves the board object for the authenticated user.
     def get_object(self):
         board = get_object_or_404(Board, pk=self.kwargs.get('pk'))
         user = self.request.user
@@ -114,7 +119,7 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
     
         return board
 
-        
+    # Updates the board object with the provided data.
     def update(self, request, *args, **kwargs):
         try:
             partial = kwargs.pop('partial', False)
@@ -139,7 +144,7 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         except Exception as e:
             return internal_error_response_500(e)
 
-        
+    # Performs the update operation on the board instance.
     def perform_update(self, serializer):
         user = self.request.user
         board = serializer.save()
@@ -151,7 +156,7 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         board.member_count = board.members.count()
         board.save()
 
-
+    # Deletes the board object if the user is the owner.
     def destroy(self, request, *args, **kwargs):
         try:
             board = self.get_object()
@@ -171,6 +176,7 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    # Performs the deletion of the board instance.
     def perform_destroy(self, instance):
         instance.delete()  
 
@@ -182,13 +188,14 @@ class EmailCheckView(APIView):
     """
     permission_classes = [IsAuthenticatedWithCustomMessage]
 
+    # Retrieves user data based on the provided email query parameter.
     def get(self, request):
         email = request.query_params.get("email", "").strip()
 
         if not email:
             return Response(
                 {"detail": "E-Mail-Parameter fehlt."}, 
-                status=status.HTTP_400_BAD_REQUEST
+                status=400
             )
 
         try:
@@ -202,12 +209,12 @@ class EmailCheckView(APIView):
         try:
             user = CustomUser.objects.get(email=email)
             serializer = UserSerializer(user)
-            return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.data, status=200)
         
         except CustomUser.DoesNotExist:
             return Response(
                 {"detail": "Kein Benutzer mit dieser E-Mail gefunden."}, 
-                status=status.HTTP_404_NOT_FOUND
+                status=404
             )
         
         except Exception as e:
