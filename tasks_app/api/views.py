@@ -62,11 +62,11 @@ class TaskAssignedToMeView(ListCreateAPIView):
             queryset = self.get_queryset()
 
             if not queryset.exists():
-                return Response(status=status.HTTP_200_OK)
+                return Response([], status=status.HTTP_200_OK)
 
             queryset = queryset.filter(assignee=user)
             if not queryset.exists():
-                return Response(status=status.HTTP_200_OK)
+                return Response([], status=status.HTTP_200_OK)
             
             serializer = self.get_serializer(queryset, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -144,7 +144,7 @@ class TaskReviewingView(ListAPIView):
             queryset = self.get_queryset()
 
             if not queryset.exists():
-                return Response(status=status.HTTP_200_OK)
+                return Response([], status=status.HTTP_200_OK)
 
             serializer = self.get_serializer(queryset, many=True)
             return Response(serializer.data, status=status.HTTP_200_OK)
@@ -244,10 +244,8 @@ class TaskCommentsView(generics.ListAPIView):
             return Task.objects.filter(
                 models.Q(assignee=user) | models.Q(reviewer=user)
             ).distinct()
-        except Task.DoesNotExist:
-            raise NotFound("Task not found.")
         except Exception as e:
-            return internal_error_response_500(e)
+            raise NotFound("Fehler beim Laden der Aufgaben: " + str(e))
 
 
 class TaskCreateCommentView(generics.ListCreateAPIView):
