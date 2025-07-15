@@ -9,8 +9,16 @@ from .serializers import RegistrationSerializer
 User = get_user_model()
 
 class RegistrationView(APIView):
+    """
+    View for user registration.
+    It handles the registration of new users by validating the input data,
+    creating a new user, and returning a token for authentication.
+    The 'fullname', 'email', and 'password' fields are required.
+    The 'repeated_password' field is used to confirm the password.
+    """
     permission_classes = [permissions.AllowAny] 
 
+    # POST method to handle user registration
     def post(self, request, *args, **kwargs):
         try:
             serializer = RegistrationSerializer(data=request.data)
@@ -34,8 +42,15 @@ class RegistrationView(APIView):
             )
     
 class CustomLoginView(APIView):
+    """
+    View for user login.
+    It handles user authentication by checking the provided email and password.
+    If the credentials are valid, it returns a token for authentication.
+    The 'email' and 'password' fields are required.
+    """
     permission_classes = [permissions.AllowAny]
 
+    # POST method to handle user login
     def post(self, request, *args, **kwargs):
    
             email = request.data.get('email')
