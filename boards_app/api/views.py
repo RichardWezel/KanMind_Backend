@@ -20,9 +20,9 @@ from .permissions import IsAuthenticatedWithCustomMessage
 
 
 # This function handles internal server errors and returns a standardized response.
-def internal_error_response_500(e):
+def internal_error_response_500(exception):
     return Response(
-        {"error": str(e)},
+        {"error": "Ein interner Serverfehler ist aufgetreten.", "details": str(exception)},
         status=status.HTTP_500_INTERNAL_SERVER_ERROR
     )
 
@@ -50,14 +50,14 @@ class BoardView(ListCreateAPIView):
         try:
             user = request.user
             if not user.is_authenticated:
-                return Response(status=status.HTTP_401_UNAUTHORIZED)
+                return Response(
+                {"detail": "Authentication credentials were not provided."},
+                status=status.HTTP_401_UNAUTHORIZED
+            )
             
             queryset = self.get_queryset()
-            
-            if not queryset.exists():
-                return Response(status=status.HTTP_200_OK)
-         
             serializer = self.get_serializer(queryset, many=True)
+
             return Response(serializer.data, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -119,6 +119,7 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
             partial = kwargs.pop('partial', False)
             instance = self.get_object()
             request_members = self.request.data.get('members', [])
+
             valid_users = CustomUser.objects.filter(id__in=request_members)
             if valid_users.count() != len(request_members):
                 return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -139,11 +140,13 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         
     def perform_update(self, serializer):
-        
         user = self.request.user
         board = serializer.save()
-        members = self.request.data.get('members', [])
-        board.members.set(members + [user.id])
+
+        members = self.request.data.get('members', None)
+        if members is not None:
+            board.members.set(members + [user.id])
+
         board.member_count = board.members.count()
         board.save()
 
@@ -152,7 +155,7 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         try:
             board = self.get_object()
 
-            if board.owner_id != request.user:
+            if board.owner_id != request.user.id:
                 raise PermissionDenied("Nur der Eigentümer darf das Board löschen.")
 
             self.perform_destroy(board)
@@ -160,8 +163,10 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         except Http404:
             return Response({"detail": "Board wurde nicht gefunden."}, status=status.HTTP_404_NOT_FOUND)
+        
         except PermissionDenied as e:
             return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
