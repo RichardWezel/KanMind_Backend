@@ -3,6 +3,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate, get_user_model
+from .utils import validate_login_data, get_user_token_response
 
 from .serializers import RegistrationSerializer
 
@@ -52,35 +53,15 @@ class CustomLoginView(APIView):
 
     # POST method to handle user login
     def post(self, request, *args, **kwargs):
-   
-            email = request.data.get('email')
-            password = request.data.get('password')
+        email, password, error_response = validate_login_data(request.data)
+        if error_response:
+            return error_response
 
-            if not email or not password:
-                return Response(
-                    {"detail": "E-Mail und Passwort sind erforderlich."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
-            try:
-                user = authenticate(request, username=email, password=password)
+        user = authenticate(request, username=email, password=password)
+        if user is None:
+            return Response(
+                {"detail": "E-Mail oder Passwort ist falsch."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
-                if user is None:
-                    return Response(
-                    {"detail": "E-Mail oder Passwort ist falsch."},
-                    status=status.HTTP_400_BAD_REQUEST  # Hier 400 statt 401
-                )
-
-                token, created = Token.objects.get_or_create(user=user)
-                return Response({
-                    'token': token.key,
-                    'fullname': user.fullname,
-                    'email': user.email,
-                    'user_id': user.id,
-                }, status=status.HTTP_200_OK)
-            
-            except Exception as e:
-                return Response(
-                    {'detail': 'Interner Serverfehler.'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+        return get_user_token_response(user)
