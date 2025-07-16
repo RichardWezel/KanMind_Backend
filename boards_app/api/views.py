@@ -11,7 +11,7 @@ from rest_framework import generics, status
 from rest_framework.generics import ListCreateAPIView
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.views import APIView
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, NotFound
 
 from auth_app.models import CustomUser
 from auth_app.api.serializers import UserSerializer  
@@ -51,41 +51,28 @@ class BoardView(ListCreateAPIView):
     def list(self, request, *args, **kwargs):
      
         try:
-            user = request.user
-            if not user.is_authenticated:
-                return Response(
-                {"detail": "Authentication credentials were not provided."},
-                status=status.HTTP_401_UNAUTHORIZED
-            )
-            
             queryset = self.get_queryset()
             serializer = self.get_serializer(queryset, many=True)
-
             return Response(serializer.data, status=status.HTTP_200_OK)
-
         except Exception as e:
             return internal_error_response_500(e)
     
     # Creates a new board for the authenticated user.
     def create(self, request, *args, **kwargs):
         try:
-            user = request.user
-            if not user.is_authenticated:
-                return Response(status=status.HTTP_401_UNAUTHORIZED)
-            
-            serializer = BoardSerializer(data=request.data)
-            if not serializer.is_valid():
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+            serializer = self.get_queryset()
+            serializer.is_valide(raise_exception=True)
 
-            serializer = self.get_serializer(data=request.data)
-            serializer.is_valid(raise_exception=True)
-            board = serializer.save(owner_id=user)
-            board.members.add(user)
+            board = serializer.save(owner_id=request.user)
+            board.members.add(request.user)
             board.member_count = board.members.count()
             board.save()
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+        except ValidationError as ve:
+            return Response(ve.detail, status=status.HTTP_400_BAD_REQUEST)
+        
         except Exception as e:
             return internal_error_response_500(e)
         
@@ -115,7 +102,7 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         user = self.request.user
     
         if board.owner_id != user and not board.members.filter(id=user.id).exists():
-            raise PermissionDenied("Du hast keinen Zugriff auf dieses Board.")
+            raise PermissionDenied("You do not have access to this board.")
     
         return board
 
@@ -124,34 +111,32 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         try:
             partial = kwargs.pop('partial', False)
             instance = self.get_object()
-            request_members = self.request.data.get('members', [])
 
+            request_members = self.request.data.get('members', [])
             valid_users = CustomUser.objects.filter(id__in=request_members)
+
             if valid_users.count() != len(request_members):
-                return Response(status=status.HTTP_400_BAD_REQUEST)
+                raise ValidationError({"members": "One or more user IDs are invalid."})
 
             serializer = self.get_serializer(instance, data=request.data, partial=partial)
             serializer.is_valid(raise_exception=True)
+
             self.perform_update(serializer)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        except PermissionDenied as e:
-            return Response({'detail': str(e)}, status=status.HTTP_403_FORBIDDEN)
-
-        except Http404:
-            return Response({'detail': 'Board wurde nicht gefunden.'}, status=status.HTTP_404_NOT_FOUND)
+        except (PermissionDenied, NotFound, ValidationError) as e:
+            raise e
 
         except Exception as e:
             return internal_error_response_500(e)
 
     # Performs the update operation on the board instance.
     def perform_update(self, serializer):
-        user = self.request.user
         board = serializer.save()
 
         members = self.request.data.get('members', None)
         if members is not None:
-            board.members.set(members + [user.id])
+            board.members.set(members + [self.request.user.id])
 
         board.member_count = board.members.count()
         board.save()
@@ -162,16 +147,13 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
             board = self.get_object()
 
             if board.owner_id != request.user.id:
-                raise PermissionDenied("Nur der Eigentümer darf das Board löschen.")
+                raise PermissionDenied("Only the owner may delete the board.")
 
             self.perform_destroy(board)
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response({}, status=status.HTTP_200_OK)
 
-        except Http404:
-            return Response({"detail": "Board wurde nicht gefunden."}, status=status.HTTP_404_NOT_FOUND)
-        
-        except PermissionDenied as e:
-            return Response({"detail": str(e)}, status=status.HTTP_403_FORBIDDEN)
+        except (PermissionDenied, NotFound) as e:
+            raise e
         
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -190,32 +172,28 @@ class EmailCheckView(APIView):
 
     # Retrieves user data based on the provided email query parameter.
     def get(self, request):
-        email = request.query_params.get("email", "").strip()
-
-        if not email:
-            return Response(
-                {"detail": "E-Mail-Parameter fehlt."}, 
-                status=400
-            )
-
         try:
-            validate_email(email)
-        except EmailNotValidError:
-            return Response(
-                {"detail": "Ungültige E-Mail-Adresse."}, 
-                status=400
-            )
-        
-        try:
-            user = CustomUser.objects.get(email=email)
+            email = request.query_params.get("email", "").strip()
+
+            if not email:
+                raise ValidationError({"email": "E-mail parameter is missing."})
+
+            try:
+                validate_email(email)
+            except EmailNotValidError:
+                raise ValidationError({"email": "Unvalid email address."})
+
+
+            try:
+                user = CustomUser.objects.get(email=email)
+            except CustomUser.DoesNotExist:
+                    raise NotFound("No user found with this email address.")
+
             serializer = UserSerializer(user)
-            return Response(serializer.data, status=200)
+            return Response(serializer.data)
         
-        except CustomUser.DoesNotExist:
-            return Response(
-                {"detail": "Kein Benutzer mit dieser E-Mail gefunden."}, 
-                status=404
-            )
+        except (ValidationError, NotFound) as e:
+            raise e  
         
         except Exception as e:
             return internal_error_response_500(e)
