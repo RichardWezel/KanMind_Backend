@@ -5,6 +5,9 @@ from auth_app.models import CustomUser
 class Board(models.Model):
     """
     Represents a board in the application.
+
+    A board acts as a container for tasks and members. It is owned by a single user,
+    can have multiple members and reviewers, and tracks task and ticket statistics.
     """
     title = models.CharField(max_length=255, unique=True, help_text="Name of the board")
     members = models.ManyToManyField(CustomUser, verbose_name=("members"), related_name='board_members', blank=True, help_text="Users who are members of the board")
@@ -17,6 +20,13 @@ class Board(models.Model):
     due_date = models.DateField(null=True, blank=True, help_text="Due date for the board tasks")
 
     def __str__(self):
+        """
+        Return the string representation of the board.
+
+        Returns:
+            str: The title of the board.
+        """
+         
         return self.title
 
     class Meta:

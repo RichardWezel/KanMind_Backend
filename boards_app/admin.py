@@ -4,6 +4,16 @@ from .models import Board
 
 @admin.register(Board)
 class BoardAdmin(admin.ModelAdmin):
+    """
+    Admin interface for the Board model.
+
+    Includes:
+    - Custom list display and filtering
+    - Permissions based on user roles (owner or staff)
+    - Automatic setting of owner and member data on creation
+    - Read-only logic for computed fields
+    """
+
     list_display = ('id', 'title', 'owner_id', 'member_count', 'ticket_count', 
                     'tasks_to_do_count', 'tasks_hight_prio_count')
     search_fields = ('title',)
@@ -11,6 +21,9 @@ class BoardAdmin(admin.ModelAdmin):
     ordering = ('-id',)
     
     def get_queryset(self, request):
+        """
+        Optimize queryset by preloading the related owner.
+        """
         qs = super().get_queryset(request)
         return qs.select_related('owner_id')
     def member_count(self, obj):
@@ -31,18 +44,31 @@ class BoardAdmin(admin.ModelAdmin):
     def has_add_permission(self, request):
         return request.user.is_authenticated and request.user.is_staff
     def has_change_permission(self, request, obj=None):
+        """
+        Allow staff or the board owner to change the board.
+        """
         if obj is None:
             return request.user.is_authenticated and request.user.is_staff
         return request.user.is_authenticated and (request.user.is_staff or request.user == obj.owner_id)
     def has_delete_permission(self, request, obj=None):
+        """
+        Allow staff or the board owner to delete the board.
+        """
         if obj is None:
             return request.user.is_authenticated and request.user.is_staff
         return request.user.is_authenticated and (request.user.is_staff or request.user == obj.owner_id)
     def has_view_permission(self, request, obj=None):
+        """
+        Allow staff or the board owner to view the board.
+        """
         if obj is None:
             return request.user.is_authenticated
         return request.user.is_authenticated and (request.user.is_staff or request.user == obj.owner_id)
     def save_model(self, request, obj, form, change):
+        """
+        Set ownership and initialize counters when creating a board.
+        Also adds the creator as a member.
+        """
         if not change:
             obj.owner_id = request.user
             obj.member_count = 1
@@ -60,20 +86,32 @@ class BoardAdmin(admin.ModelAdmin):
             obj.member_count = 1
             obj.save()
     def delete_model(self, request, obj):
+        """
+        Delete the board only if the user is staff or the owner.
+        """
         if request.user.is_authenticated and (request.user.is_staff or request.user == obj.owner_id):
             obj.delete()
         else:
             raise PermissionError("You do not have permission to delete this board.")
     def get_readonly_fields(self, request, obj=None):
+        """
+        Make counters and ownership read-only for existing boards.
+        """
         if obj is None:
             return []
         return ['owner_id', 'member_count', 'ticket_count', 'tasks_to_do_count', 'tasks_hight_prio_count']
     def get_fields(self, request, obj=None):
+        """
+        Show the 'members' field only during creation.
+        """
         fields = super().get_fields(request, obj)
         if obj is None:
             fields.append('members')
         return fields
     def get_form(self, request, obj=None, **kwargs):
+        """
+        Make 'members' optional when creating a board.
+        """
         form = super().get_form(request, obj, **kwargs)
         if obj is None:
             form.base_fields['members'].required = False

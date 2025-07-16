@@ -9,11 +9,19 @@ from tasks_app.api.serializers import TasksBoardDetailsSerializer
 class BoardSerializer (serializers.ModelSerializer):
     """
     Serializer for creating and updating a board.
-    It includes fields for the board's title, members, and owner.
-    The 'members' field is a write-only field that allows the addition of members to the
-    board during creation or update.
-    The 'owner_id' field is read-only and represents the owner of the board.
+
+    Fields:
+        - title: The name of the board (required).
+        - members: A list of user IDs to be added as board members (write-only).
+        - owner_id: The user who owns the board (read-only).
+        - member_count, ticket_count, tasks_to_do_count, tasks_hight_prio_count:
+          Counters related to board content (all read-only).
+
+    Notes:
+        The 'members' field accepts a list of user IDs.
+        The owner is automatically assigned (usually the current user).
     """
+   
     members = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=CustomUser.objects.all(),
@@ -31,11 +39,15 @@ class BoardSerializer (serializers.ModelSerializer):
 
 class BoardDetailSerializer (serializers.ModelSerializer):
     """
-    Serializer for retrieving board details.
-    It includes the board's title, members, owner, and tasks.
-    The 'members' field is read-only and returns a list of user details.
-    The 'tasks' field returns a list of tasks associated with the board.
+    Serializer for retrieving detailed board information.
+
+    Includes:
+        - title: The board's title (read-only).
+        - owner_id: The owner's user ID (read-only).
+        - members: A list of user details (read-only).
+        - tasks: A list of tasks assigned to the board (read-only).
     """
+
     members = UserSerializer(many=True)
     owner_id = serializers.PrimaryKeyRelatedField(read_only=True)
     tasks = TasksBoardDetailsSerializer(many=True, read_only=True)
@@ -48,13 +60,24 @@ class BoardDetailSerializer (serializers.ModelSerializer):
 
 class BoardUpdateSerializer(serializers.ModelSerializer):
     """
-    Serializer for updating a board.
-    It allows the owner to update the board's title and members.
-    The 'members' field is a write-only field that allows the addition of members to the
-    board during update.
-    The 'owner_data' field is read-only and returns the owner's details.
-    The 'members_data' field is read-only and returns a list of member details.
+    Serializer for updating board data.
+
+    Use cases:
+        - Update the board's title.
+        - Modify the list of member user IDs.
+
+    Writeable:
+        - title: The new board name.
+        - members: List of user IDs to replace the current members.
+
+    Read-only:
+        - owner_data: The owner's user details.
+        - members_data: A list of member user details.
+
+    Notes:
+        This serializer is typically used in PATCH requests.
     """
+    
     members = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=CustomUser.objects.all(),

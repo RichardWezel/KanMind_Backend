@@ -20,36 +20,56 @@ from .serializers import BoardSerializer, BoardDetailSerializer, BoardUpdateSeri
 from .permissions import IsAuthenticatedWithCustomMessage
 
 
-# This function handles internal server errors and returns a standardized response.
 def internal_error_response_500(exception):
+    """
+    Return a standardized internal server error response.
+
+    Args:
+        exception (Exception): The raised exception.
+
+    Returns:
+        Response: A DRF Response with a 500 status and error details.
+    """
+
     return Response(
-        {"error": "Ein interner Serverfehler ist aufgetreten.", "details": str(exception)},
+        {"error": "An internal server error has occurred.", "details": str(exception)},
         status=status.HTTP_500_INTERNAL_SERVER_ERROR
     )
 
 class BoardView(ListCreateAPIView):
     """
-    This view handles the listing and creation of boards.
-    It checks if the user is authenticated and has permission to access the boards.
-    If the user is not authenticated, it raises a PermissionDenied error.
-    The view expects the request to contain a 'members' field, which is a list of
-    user IDs to be added as members of the board.
-    If the 'members' field is not provided, it will not add any members to the board.
+    API view for listing and creating boards.
+
+    GET:
+        Returns a list of all boards where the authenticated user is the owner or a member.
+
+    POST:
+        Creates a new board. The authenticated user becomes the owner and is
+        automatically added as a member. The request must include a 'title' and a
+        list of 'members' (user IDs).
+
+    Permissions:
+        Requires authentication (custom permission with a helpful error message).
     """
 
     serializer_class = BoardSerializer
     permission_classes = [IsAuthenticatedWithCustomMessage] 
 
-    # Retrieves the queryset of boards for the authenticated user.
     def get_queryset(self):
+        """
+        Return boards where the authenticated user is the owner or a member.
+        """
+
         user = self.request.user
         return Board.objects.filter(
             models.Q(owner_id=user) | models.Q(members=user)
         ).distinct().order_by('id')
 
-    # Lists all boards for the authenticated user.
     def list(self, request, *args, **kwargs):
-     
+        """
+        List all boards for the authenticated user.
+        """
+
         try:
             queryset = self.get_queryset()
             serializer = self.get_serializer(queryset, many=True)
@@ -57,8 +77,12 @@ class BoardView(ListCreateAPIView):
         except Exception as e:
             return internal_error_response_500(e)
     
-    # Creates a new board for the authenticated user.
     def create(self, request, *args, **kwargs):
+        """
+        Create a new board owned by the authenticated user.
+
+        The user is also added as a member, and the member count is updated.
+        """
         try:
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
@@ -79,25 +103,40 @@ class BoardView(ListCreateAPIView):
 
 class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
-    This view handles the retrieval, update, and deletion of a specific board.
-    It checks if the user is authenticated and has permission to access the board.
-    If the user is not authenticated or does not have permission, it raises a PermissionDenied error
-    or NotFound error.
-    The view expects the request to contain a 'members' field, which is a list of
-    user IDs to be added as members of the board.
-    If the 'members' field is not provided, it will not update the members of the
-    board, but will still allow the owner to update other fields.
+    API view for retrieving, updating, or deleting a specific board.
+
+    GET:
+        Retrieve board details including title, owner, members, and tasks.
+
+    PATCH:
+        Update title or members of the board (only for owner or members).
+
+    DELETE:
+        Delete the board (only allowed for the owner).
+
+    Permissions:
+        Only accessible to board owners and members.
     """
+
     permission_classes = [IsAuthenticatedWithCustomMessage] 
 
-    # Retrieves the board object based on the primary key (pk) provided in the URL.
     def get_serializer_class(self):
+        """
+        Return the appropriate serializer depending on the request method.
+        """
+
         if self.request.method == 'GET':
             return BoardDetailSerializer
         return BoardUpdateSerializer
     
-    # Retrieves the board object for the authenticated user.
     def get_object(self):
+        """
+        Retrieve the board instance and check user permissions.
+
+        Raises:
+            PermissionDenied: If the user has no access to this board.
+        """
+
         board = get_object_or_404(Board, pk=self.kwargs.get('pk'))
         user = self.request.user
     
@@ -106,8 +145,13 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
     
         return board
 
-    # Updates the board object with the provided data.
     def update(self, request, *args, **kwargs):
+        """
+        Update board fields like title and members.
+
+        Validates user IDs in the 'members' field and adds the current user to the list.
+        """
+
         try:
             partial = kwargs.pop('partial', False)
             instance = self.get_object()
@@ -130,8 +174,11 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         except Exception as e:
             return internal_error_response_500(e)
 
-    # Performs the update operation on the board instance.
     def perform_update(self, serializer):
+        """
+        Save updated board data and update members list and count.
+        """
+           
         board = serializer.save()
 
         members = self.request.data.get('members', None)
@@ -143,6 +190,10 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     # Deletes the board object if the user is the owner.
     def destroy(self, request, *args, **kwargs):
+        """
+        Delete the board if the authenticated user is the owner.
+        """
+
         try:
             board = self.get_object()
 
@@ -158,20 +209,38 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         except Exception as e:
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-    # Performs the deletion of the board instance.
     def perform_destroy(self, instance):
+        """
+        Delete the board instance from the database.
+        """
         instance.delete()  
 
 
 class EmailCheckView(APIView):
     """
-    This view checks if a user with the given email exists.
-    It returns the user data if found, or a 404 error if not.
+    API view to check whether a user with the given email exists.
+
+    GET:
+        Query param: ?email=<email>
+        - Returns user data if the email exists.
+        - Returns 404 if no user is found.
+        - Returns 400 if the email is invalid or missing.
+
+    Permissions:
+        Requires authentication.
     """
+
     permission_classes = [IsAuthenticatedWithCustomMessage]
 
-    # Retrieves user data based on the provided email query parameter.
     def get(self, request):
+        """
+        Validate the provided email and return the user data if found.
+
+        Raises:
+            ValidationError: If email is missing or invalid.
+            NotFound: If no user exists with the given email.
+        """
+        
         try:
             email = request.query_params.get("email", "").strip()
 
