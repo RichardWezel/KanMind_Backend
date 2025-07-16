@@ -9,16 +9,29 @@ from boards_app.models import Board
 
 class IsMemberOfBoard(BasePermission):
     """
-    Permission class that allows access only to members or the owner of a board.
-    - For POST requests, checks if the user is authenticated and a member or owner of the specified board.
-    - For other methods, allows access by default.
-    - For object-level permissions, ensures the user is a member or owner of the board associated with the object.
+    Allows access only to members or the owner of a board.
+
+    Use cases:
+    - On POST: Checks whether the user is a member or the owner of the board (via board ID).
+    - On other methods: Grants permission.
+    - On object level: Checks if the user is related to the task's board.
+
     Raises:
-        PermissionDenied: If the user is not authenticated, not a member, or not the owner.
+        PermissionDenied: If the user is not a member or the owner.
         NotFound: If the specified board does not exist.
     """
 
     def has_permission(self, request, view):
+        """
+        Check global permissions for a request.
+
+        For POST: ensure the user is a member or the owner of the specified board.
+        For other methods: allow access.
+
+        Returns:
+            bool: True if access is granted.
+        """
+
         user = request.user
         if not user.is_authenticated:
             raise PermissionDenied("You must be logged in.")
@@ -41,6 +54,15 @@ class IsMemberOfBoard(BasePermission):
         return True  # für alle anderen Methoden erstmal OK
 
     def has_object_permission(self, request, view, obj):
+        """
+        Check object-level permissions.
+
+        The user must be a member or the owner of the board linked to the task.
+
+        Returns:
+            bool: True if access is granted.
+        """
+
         user = request.user
         owner = obj.board.owner_id
         # Zugriff auf das Task-Objekt → Board
@@ -52,15 +74,25 @@ class IsMemberOfBoard(BasePermission):
         
 class IsMemberOfBoardComments(BasePermission):
     """
-    Permission class that allows access to comments only for members or the owner of the board.
-    - Checks if the user is authenticated and a member or owner of the board associated with the
-    comment.
-    - Raises PermissionDenied if the user is not authenticated, not a member, or not the
-    owner of the board.
-    - Raises NotFound if the specified task does not exist.
+    Allows access to task comments only for board members or the owner.
+
+    Use cases:
+    - Requires the user to be authenticated and part of the board that owns the task.
+    - Validates task ID from the URL.
+
+    Raises:
+        PermissionDenied: If user lacks permission.
+        NotFound: If the task doesn't exist.
     """
 
     def has_permission(self, request, view):
+        """
+        Check permission for comment access based on task and board membership.
+
+        Returns:
+            bool: True if the user has permission.
+        """
+
         user = request.user
         if not user.is_authenticated:
             raise PermissionDenied("You must be logged in.")
@@ -81,6 +113,13 @@ class IsMemberOfBoardComments(BasePermission):
         return True
     
     def has_object_permission(self, request, view, obj):
+        """
+        Check object-level permission for comments on a task.
+
+        Returns:
+            bool: True if the user is authorized.
+        """
+
         user = request.user
         owner = obj.board.owner_id
         # Zugriff auf das Task-Objekt → Board
@@ -92,9 +131,9 @@ class IsMemberOfBoardComments(BasePermission):
 
 class IsAuthorOfComment(BasePermission):
     """
-    Permission class that allows access to comments only for the author of the comment.
-    - Checks if the user is the author of the comment.
-    - Raises PermissionDenied if the user is not the author.
+    Check object-level permission based on comment author.
+    Returns:
+        bool: True if the request user is the comment's author.
     """
 
     def has_object_permission(self, request, view, obj):

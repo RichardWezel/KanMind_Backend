@@ -4,14 +4,20 @@ from tasks_app.models import Task, TaskComment
 from auth_app.api.serializers import UserSerializer
 from auth_app.models import CustomUser
 
-
-# Serializer for user field to be reused in multiple serializers
 def user_field():
+    """
+    Returns a serializer field for the user, which is read-only and returns user details.
+    This field is used for the 'assignee' and 'reviewer' fields in the TaskSerializer.
+    """
     return UserSerializer(read_only=True)
 
-
-# Serializer for user field with write-only primary key related field
 def pk_field_for(source_name):
+    """
+    Returns a PrimaryKeyRelatedField for the specified source name.
+    This field
+    is used for the 'assignee_id' and 'reviewer_id' fields in the TaskCreateSerializer and TaskUpdateSerializer.
+    It allows for the assignment of a user by their primary key.
+    """
     return serializers.PrimaryKeyRelatedField(
         queryset=CustomUser.objects.all(),
         source=source_name,
@@ -20,15 +26,16 @@ def pk_field_for(source_name):
         allow_null=True   
     )
 
-
 class TaskSerializer(serializers.ModelSerializer):
     """
-    Serializer for Task model.
-    It includes fields for the task's title, description, status, priority,
-    assignee, reviewer, and due date.
-    The 'assignee' and 'reviewer' fields are read-only and return user details
-    The 'comments_count' field is a read-only field that returns the number of comments on the task.
+    Serializer for displaying task data.
+
+    Includes task information such as:
+    - title, description, status, priority
+    - read-only user info for assignee and reviewer
+    - due date and comment count
     """
+
     assignee = user_field()
     reviewer = user_field()
 
@@ -44,10 +51,13 @@ class TaskSerializer(serializers.ModelSerializer):
 
 class TasksBoardDetailsSerializer(serializers.ModelSerializer):
     """
-    Serializer for Task model to be used in Board details.
-    It includes fields for the task's title, description, status, priority,
-    assignee, reviewer, and due date.
+    Serializer for displaying tasks inside board detail views.
+
+    Includes:
+    - full task information
+    - assignee and reviewer as nested user data
     """
+   
     assignee = user_field()
     reviewer = user_field()
 
@@ -63,10 +73,14 @@ class TasksBoardDetailsSerializer(serializers.ModelSerializer):
 
 class TaskCreateSerializer(serializers.ModelSerializer):
     """
-    Serializer for creating a new Task.
-    It includes fields for the task's title, description, status, priority,
-    assignee, reviewer, and due date.
+    Serializer for creating a new task.
+
+    Accepts:
+    - board, title, description, status, priority
+    - optional assignee_id and reviewer_id as user PKs
+    - optional due date
     """
+
     assignee_id = pk_field_for('assignee')
     reviewer_id = pk_field_for('reviewer')
     status = serializers.ChoiceField(
@@ -92,10 +106,14 @@ class TaskCreateSerializer(serializers.ModelSerializer):
 
 class TaskUpdateSerializer(serializers.ModelSerializer):
     """
-    Serializer for updating an existing Task.
-    It includes fields for the task's title, description, status, priority,
-    assignee, reviewer, and due date.
+    Serializer for updating an existing task.
+
+    Accepts:
+    - all fields of a task, including assignee and reviewer (by user ID)
+    Returns:
+    - nested user objects for assignee and reviewer
     """
+
     assignee_id = serializers.PrimaryKeyRelatedField(
         queryset=CustomUser.objects.all(),
         source='assignee',
@@ -124,6 +142,10 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
         read_only_fields = ['id']
     
     def update(self, instance, validated_data):
+        """
+        Update all task fields with incoming validated data.
+        """
+
         instance.title = validated_data.get('title', instance.title)
         instance.description = validated_data.get('description', instance.description)
         instance.status = validated_data.get('status', instance.status)
@@ -136,10 +158,14 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
 
 class TaskCommentSerializer(serializers.ModelSerializer):
     """
-    Serializer for TaskComment model.
-    It includes fields for the comment's content, creation date, and author.
-    The 'author' field is a read-only field that returns the author's full name.
+    Serializer for displaying task comments.
+
+    Includes:
+    - comment content
+    - creation timestamp
+    - author's full name (read-only)
     """
+    
     author = serializers.SerializerMethodField()
 
     class Meta:

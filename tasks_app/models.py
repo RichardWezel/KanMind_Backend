@@ -4,6 +4,18 @@ from boards_app.models import Board
 
 
 class Task(models.Model):
+    """
+    Represents a task within a board.
+
+    A task can have a title, description, status, priority,
+    an optional assignee and reviewer, and an optional due date.
+
+    Relationships:
+        - Belongs to a Board
+        - May be assigned to a User
+        - May be reviewed by a User
+    """
+
     STATUS_TODO = 'to-do'
     STATUS_IN_PROGRESS = 'in-progress'
     STATUS_REVIEW = 'review'
@@ -37,6 +49,9 @@ class Task(models.Model):
     comments_count = models.PositiveIntegerField(default=0)
     
     def __str__(self):
+        """
+        Return the string representation of the task.
+        """
         return self.title
 
     class Meta:
@@ -45,6 +60,14 @@ class Task(models.Model):
         ordering = ['title'] 
 
 class TaskComment(models.Model):
+    """
+    Represents a comment made by a user on a task.
+
+    Relationships:
+        - Belongs to a Task
+        - Has an author (User)
+    """
+
     id = models.AutoField(primary_key=True)
     created_at = models.DateTimeField(auto_now_add=True)
     author = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='task_comments')
@@ -52,6 +75,9 @@ class TaskComment(models.Model):
     task = models.ForeignKey(Task, on_delete=models.CASCADE, related_name='comments')
 
     def __str__(self):
+        """
+        Return the first 50 characters of the comment for display.
+        """
         return self.content[:50]  
 
     class Meta:
