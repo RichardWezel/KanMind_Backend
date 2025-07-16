@@ -5,10 +5,13 @@ from auth_app.models import CustomUser
 
 
 class RegistrationSerializer(serializers.ModelSerializer):
-    """Serializer for user registration.
-    It includes fields for the user's full name, email, password, and repeated
-    password.
-    The 'password' field is write-only to ensure it is not exposed in responses."""
+    """
+    Serializer for registering a new user.
+
+    This serializer handles user registration by requiring a full name,
+    email, password, and a repeated password for confirmation.
+    The password is write-only and will not appear in any API responses.
+    """
     
     repeated_password = serializers.CharField(write_only=True)
 
@@ -19,16 +22,38 @@ class RegistrationSerializer(serializers.ModelSerializer):
             'password': {'write_only': True},
         }
 
-    #  Override the default validation to check for password match and existing email
     def validate(self, data):
+        """
+        Validate user input during registration.
+
+        Ensures that the provided passwords match and that the email
+        address has not already been registered.
+
+        Raises:
+            serializers.ValidationError: If the passwords do not match
+            or if the email is already in use.
+        """
+
         if data['password'] != data['repeated_password']:
             raise serializers.ValidationError("Passwörter stimmen nicht überein.")
         if CustomUser.objects.filter(email=data['email']).exists():
             raise serializers.ValidationError("Diese E-Mail wird bereits verwendet.")
         return data
 
-    #  Override the create method to handle password hashing
     def create(self, validated_data):
+        """
+        Create a new user instance with hashed password.
+
+        Removes the repeated password from the validated data,
+        hashes the password, and saves the user instance.
+
+        Args:
+            validated_data (dict): Validated user input data.
+
+        Returns:
+            CustomUser: The newly created user instance.
+        """
+
         validated_data.pop('repeated_password')
         user = CustomUser(
             email=validated_data['email'],
@@ -40,9 +65,12 @@ class RegistrationSerializer(serializers.ModelSerializer):
     
 
 class UserSerializer(serializers.ModelSerializer):
-    """Serializer for user details.
-    It includes fields for the user's ID, email, and full name.
-    The 'id' field is read-only to prevent modification."""
+    """
+    Serializer for returning user details.
+
+    Provides read-only access to the user's ID and includes
+    the email and full name in the response.
+    """
     
     class Meta:
         model = CustomUser
