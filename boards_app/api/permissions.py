@@ -9,7 +9,7 @@ class IsAuthenticatedWithCustomMessage(BasePermission):
 
     def has_permission(self, request, view):
         if not request.user or not request.user.is_authenticated:
-            raise NotAuthenticated(detail="Nicht autorisiert. Der Benutzer muss eingeloggt sein.")
+            raise NotAuthenticated(detail="Not authorized. The user must be logged in.")
         return True
 
 class IsOwnerOrMemberOfBoard(BasePermission):

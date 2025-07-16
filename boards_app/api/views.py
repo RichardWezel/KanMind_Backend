@@ -60,8 +60,8 @@ class BoardView(ListCreateAPIView):
     # Creates a new board for the authenticated user.
     def create(self, request, *args, **kwargs):
         try:
-            serializer = self.get_queryset()
-            serializer.is_valide(raise_exception=True)
+            serializer = self.get_serializer(data=request.data)
+            serializer.is_valid(raise_exception=True)
 
             board = serializer.save(owner_id=request.user)
             board.members.add(request.user)
