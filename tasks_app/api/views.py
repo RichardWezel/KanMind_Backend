@@ -128,9 +128,15 @@ class CreateTaskView(CreateAPIView):
             if not data:
                 raise ValidationError({"detail": "Request-data is missing"})
 
-            board_id = data.get('board')
-            if not board_id or not Board.objects.filter(id=board_id).exists():
+            try:
+                board_id = int(data.get('board'))
+            except (TypeError, ValueError):
+                raise ValidationError({"board": "Board must be a valid integer ID."})
+
+            if not Board.objects.filter(id=board_id).exists():
                 raise NotFound("The specified board does not exist.")
+            
+            data['board'] = board_id  # ← wichtig! Überschreibt den fehlerhaften String
 
             for field in ['assignee_id', 'reviewer_id']:
                 if data.get(field) == "":

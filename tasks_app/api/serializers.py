@@ -3,6 +3,7 @@ from rest_framework import serializers
 from tasks_app.models import Task, TaskComment
 from auth_app.api.serializers import UserSerializer
 from auth_app.models import CustomUser
+from boards_app.models import Board
 
 def user_field():
     """
@@ -80,7 +81,11 @@ class TaskCreateSerializer(serializers.ModelSerializer):
     - optional assignee_id and reviewer_id as user PKs
     - optional due date
     """
-
+    board = serializers.PrimaryKeyRelatedField(
+        queryset=Board.objects.all(),
+        write_only=True,
+        required=True
+    )
     assignee_id = pk_field_for('assignee')
     reviewer_id = pk_field_for('reviewer')
     status = serializers.ChoiceField(

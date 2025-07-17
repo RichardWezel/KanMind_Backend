@@ -2,6 +2,7 @@ from rest_framework.permissions import BasePermission
 from rest_framework.exceptions import PermissionDenied as Forbidden
 from rest_framework.permissions import BasePermission
 from rest_framework.exceptions import PermissionDenied, NotFound
+from rest_framework.exceptions import ValidationError
 
 from tasks_app.models import Task
 from boards_app.models import Board 
@@ -32,27 +33,20 @@ class IsMemberOfBoard(BasePermission):
             bool: True if access is granted.
         """
 
-        user = request.user
-        if not user.is_authenticated:
-            raise PermissionDenied("You must be logged in.")
-
         if request.method == "POST":
-
-            board_id = request.data.get('board')
-            if not board_id:
-                raise NotFound("Board ID is missing or invalid.")
-
+            board_id = request.data.get("board")
             try:
-                board = Board.objects.get(id=board_id)
-            except Board.DoesNotExist:
-                raise NotFound("Board does not exist. Please check the ID.")
-            except PermissionDenied:
-                raise PermissionDenied("You do not have permission to access this board.")
+                board_id = int(board_id)
+            except (TypeError, ValueError):
+                raise ValidationError({"board": "Board must be a valid integer ID."})
 
-            if user not in board.members.all() and user != board.owner_id:
-                raise PermissionDenied("You are not a member of this board.")
+            if not Board.objects.filter(id=board_id).exists():
+                raise NotFound("Board not found.")
 
-        return True  
+            board = Board.objects.get(id=board_id)
+            if request.user not in board.members.all() and board.owner_id != request.user:
+                return False
+            return True  
 
     def has_object_permission(self, request, view, obj):
         """
