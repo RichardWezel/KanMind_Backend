@@ -197,7 +197,7 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         try:
             board = self.get_object()
 
-            if board.owner_id != request.user.id:
+            if board.owner_id != request.user:
                 raise PermissionDenied("Only the owner may delete the board.")
 
             self.perform_destroy(board)

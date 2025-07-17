@@ -237,7 +237,7 @@ class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
         try:
             instance = self.get_object()
 
-            if instance.assignee != request.user and instance.board.owner_id != request.user.id:
+            if instance.assignee != request.user and instance.board.owner_id != request.user:
                 raise PermissionDenied("Only the editor or the board owner may delete the task and the specified board does not exist.")
 
             self.perform_destroy(instance)
