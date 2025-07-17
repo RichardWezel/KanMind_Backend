@@ -50,7 +50,7 @@ class IsMemberOfBoard(BasePermission):
             if user not in board.members.all() and user != board.owner:
                 raise PermissionDenied("You are not a member of this board.")
 
-        return True  # für alle anderen Methoden erstmal OK
+        return True  
 
     def has_object_permission(self, request, view, obj):
         """
@@ -64,7 +64,6 @@ class IsMemberOfBoard(BasePermission):
 
         user = request.user
         owner = obj.board.owner_id
-        # Zugriff auf das Task-Objekt → Board
         board = obj.board
         if user not in board.members.all() and user != owner:
             raise PermissionDenied("You are not a member of this board.")
@@ -96,7 +95,7 @@ class IsMemberOfBoardComments(BasePermission):
         if not user.is_authenticated:
             raise PermissionDenied("You must be logged in.")
 
-        task_id = view.kwargs.get("pk")  # wird aus der URL geholt
+        task_id = view.kwargs.get("pk")
         if not task_id:
             raise PermissionDenied("Task-id is missing.")
 
@@ -120,10 +119,9 @@ class IsMemberOfBoardComments(BasePermission):
         """
 
         user = request.user
-        owner = obj.board.owner_id
-        # Zugriff auf das Task-Objekt → Board
+        owner_id = obj.board.owner_id
         board = obj.board
-        if user not in board.members.all() and user.id != board.owner_id:
+        if user not in board.members.all() and user.id != owner_id:
             raise PermissionDenied("You are not a member of this board.")
 
         return True
