@@ -85,6 +85,8 @@ class IsMemberOfBoardComments(BasePermission):
         NotFound: If the task doesn't exist.
     """
 
+    task_lookup_kwarg = 'task_id'  # default, kann in View überschrieben werden
+
     def has_permission(self, request, view):
         """
         Check permission for comment access based on task and board membership.
@@ -96,8 +98,10 @@ class IsMemberOfBoardComments(BasePermission):
         user = request.user
         if not user.is_authenticated:
             raise PermissionDenied("You must be logged in.")
-
-        task_id = view.kwargs.get("pk")
+        
+        # Konfigurierbaren URL-Parameternamen holen
+        lookup_kwarg = getattr(view, 'task_lookup_kwarg', self.task_lookup_kwarg)
+        task_id = view.kwargs.get(lookup_kwarg)
         if not task_id:
             raise PermissionDenied("Task-id is missing.")
 
@@ -121,11 +125,9 @@ class IsMemberOfBoardComments(BasePermission):
         """
 
         user = request.user
-        owner_id = obj.board.owner_id
-        board = obj.board
-        if user not in board.members.all() and user.id != owner_id:
+        board = obj.task.board
+        if user not in board.members.all() and user.id != board.owner_id:
             raise PermissionDenied("You are not a member of this board.")
-
         return True
 
 class IsAuthorOfComment(BasePermission):

@@ -290,6 +290,8 @@ class TaskCreateCommentView(generics.ListCreateAPIView):
     serializer_class = TaskCommentSerializer
     permission_classes = [IsAuthenticatedWithCustomMessage, IsMemberOfBoardComments]
 
+    task_lookup_kwarg = 'pk'  
+    
     def get_queryset(self):
         """
         Return comments for the task specified in the URL.
@@ -371,6 +373,8 @@ class TaskDeleteCommentView(generics.DestroyAPIView):
         IsAuthorOfComment
     ]
 
+    task_lookup_kwarg = 'task_id'
+
     def get_object(self):
         """
         Return the comment instance based on task_id and comment_id.
@@ -388,7 +392,7 @@ class TaskDeleteCommentView(generics.DestroyAPIView):
             comment_id = self.kwargs.get('comment_id')
 
             task = get_object_or_404(Task, pk=task_id)
-            comment = get_object_or_404(task.comments, pk=comment_id)
+            comment = get_object_or_404(TaskComment, pk=comment_id, task=task)
             self.check_object_permissions(self.request, comment)
             return comment
 
@@ -405,10 +409,7 @@ class TaskDeleteCommentView(generics.DestroyAPIView):
         try:
             instance = self.get_object()
             self.perform_destroy(instance)
-            return Response(status=204)
-
-        except (PermissionDenied, NotFound) as e:
-            raise e
+            return Response(status=status.HTTP_204_NO_CONTENT)
 
         except Exception as e:
             return internal_error_response_500(e)
