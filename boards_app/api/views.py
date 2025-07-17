@@ -168,7 +168,7 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
             self.perform_update(serializer)
             return Response(serializer.data, status=status.HTTP_200_OK)
 
-        except (PermissionDenied, NotFound, ValidationError) as e:
+        except (PermissionDenied, NotFound, ValidationError, Http404) as e:
             raise e
 
         except Exception as e:

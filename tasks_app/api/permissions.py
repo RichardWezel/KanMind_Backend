@@ -36,17 +36,16 @@ class IsMemberOfBoard(BasePermission):
         if not user.is_authenticated:
             raise PermissionDenied("You must be logged in.")
 
-        # Nur bei POST nötig – da haben wir noch kein Objekt
         if request.method == "POST":
 
-            board_id = view.kwargs.get('board_id') or request.data.get('board')
+            board_id = request.data.get('board')
             if not board_id:
-                raise PermissionDenied("You are not a member of the board.")
+                raise NotFound("Board ID is missing or invalid.")
 
             try:
                 board = Board.objects.get(id=board_id)
             except Board.DoesNotExist:
-                raise NotFound("Board does not exist.")
+                raise NotFound("Board does not exist. Please check the ID.")
 
             if user not in board.members.all() and user != board.owner:
                 raise PermissionDenied("You are not a member of this board.")
