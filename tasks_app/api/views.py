@@ -1,5 +1,7 @@
 from django.http import Http404
 from django.db import models
+from rest_framework.generics import get_object_or_404
+
 
 from rest_framework.response import Response
 from rest_framework import status
@@ -380,19 +382,18 @@ class TaskDeleteCommentView(generics.DestroyAPIView):
             NotFound: If the task or comment is not found.
             PermissionDenied: If the user is not the author.
         """
+        
         try:
-           task_id = self.kwargs.get('task_id')
-           comment_id = self.kwargs.get('comment_id')
-           task = Task.objects.get(pk=task_id)
-           comment = task.comments.get(pk=comment_id)
-           self.check_object_permissions(self.request, comment)
-           return comment
+            task_id = self.kwargs.get('task_id')
+            comment_id = self.kwargs.get('comment_id')
 
-        except Task.DoesNotExist:
-            raise NotFound("Task does not exist.")
+            task = get_object_or_404(Task, pk=task_id)
+            comment = get_object_or_404(task.comments, pk=comment_id)
+            self.check_object_permissions(self.request, comment)
+            return comment
 
-        except TaskComment.DoesNotExist:
-            raise NotFound("Comment does not exist.")
+        except Http404:
+            raise NotFound("Task or comment not found.")
 
     def destroy(self, request, *args, **kwargs):
         """
