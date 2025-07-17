@@ -201,7 +201,7 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
                 raise PermissionDenied("Only the owner may delete the board.")
 
             self.perform_destroy(board)
-            return Response({}, status=status.HTTP_200_OK)
+            return Response({}, status=status.HTTP_204_NO_CONTENT)
 
         except (PermissionDenied, NotFound, Http404) as e:
             raise e
