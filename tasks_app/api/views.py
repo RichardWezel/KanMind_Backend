@@ -210,9 +210,9 @@ class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
             Response: Updated task data.
         """
         try:
-            instance = self.get_object()
+            Task = self.get_object()
             serializer = self.get_serializer(
-                instance, 
+                Task, 
                 data=request.data, 
                 partial=kwargs.pop('partial', False)
             )
@@ -391,7 +391,7 @@ class TaskDeleteCommentView(generics.DestroyAPIView):
         except Task.DoesNotExist:
             raise NotFound("Task does not exist.")
 
-        except Task.comments.model.DoesNotExist:
+        except TaskComment.DoesNotExist:
             raise NotFound("Comment does not exist.")
 
     def destroy(self, request, *args, **kwargs):
