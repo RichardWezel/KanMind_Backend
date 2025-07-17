@@ -46,8 +46,10 @@ class IsMemberOfBoard(BasePermission):
                 board = Board.objects.get(id=board_id)
             except Board.DoesNotExist:
                 raise NotFound("Board does not exist. Please check the ID.")
+            except PermissionDenied:
+                raise PermissionDenied("You do not have permission to access this board.")
 
-            if user not in board.members.all() and user != board.owner:
+            if user not in board.members.all() and user != board.owner_id:
                 raise PermissionDenied("You are not a member of this board.")
 
         return True  

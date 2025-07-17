@@ -110,7 +110,7 @@ class CreateTaskView(CreateAPIView):
 
     http_method_names = ['post'] 
     serializer_class = TaskCreateSerializer
-    permission_classes = [IsAuthenticatedWithCustomMessage, IsAuthenticated, IsMemberOfBoard] 
+    permission_classes = [IsAuthenticatedWithCustomMessage, IsMemberOfBoard] 
  
     def post(self, request, *args, **kwargs):
         """
@@ -140,7 +140,7 @@ class CreateTaskView(CreateAPIView):
 
             return Response(TaskSerializer(task).data, status=status.HTTP_201_CREATED)
 
-        except (ValidationError, NotFound) as e:
+        except (ValidationError, NotFound, PermissionDenied) as e:
             raise e 
 
         except Exception as e:
