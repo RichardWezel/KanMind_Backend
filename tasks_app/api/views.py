@@ -183,7 +183,7 @@ class TaskReviewingView(ListAPIView):
             return internal_error_response_500(e)
 
 
-class TaskUpdateView(generics.RetrieveUpdateDestroyAPIView):
+class TaskDetailView(generics.RetrieveUpdateDestroyAPIView):
     """
     View to retrieve, update, or delete a specific task.
 
@@ -291,7 +291,7 @@ class TaskCreateCommentView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticatedWithCustomMessage, IsMemberOfBoardComments]
 
     task_lookup_kwarg = 'pk'  
-    
+
     def get_queryset(self):
         """
         Return comments for the task specified in the URL.
