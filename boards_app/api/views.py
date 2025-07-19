@@ -9,7 +9,7 @@ from rest_framework import generics
 from rest_framework.response import Response
 from rest_framework import generics, status
 from rest_framework.generics import ListCreateAPIView
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, NotFound, ParseError
 from rest_framework.views import APIView
 from rest_framework.exceptions import ValidationError, NotFound
 
@@ -84,6 +84,10 @@ class BoardView(ListCreateAPIView):
         The user is also added as a member, and the member count is updated.
         """
         try:
+            # Absicherung: request.data parst JSON, kann aber bei kaputtem Input crashen
+            if not isinstance(request.data, dict):
+                raise ValidationError({"detail": "Invalid JSON format."})
+            
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
 
@@ -93,6 +97,12 @@ class BoardView(ListCreateAPIView):
             board.save()
 
             return Response(serializer.data, status=status.HTTP_201_CREATED)
+        
+        except ParseError:
+            return Response(
+                {"detail": "Invalid JSON in request body."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
 
         except ValidationError as ve:
             return Response(ve.detail, status=status.HTTP_400_BAD_REQUEST)
