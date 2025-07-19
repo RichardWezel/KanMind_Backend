@@ -41,9 +41,11 @@ class BoardSerializer (serializers.ModelSerializer):
             raise serializers.ValidationError("Title must be a string.")
         if value.strip() == "":
             raise serializers.ValidationError("Title cannot be empty.")
+        if value.isdigit():
+            raise serializers.ValidationError("Title must not be a number.")
         return value
     
-    
+
 class BoardDetailSerializer (serializers.ModelSerializer):
     """
     Serializer for retrieving detailed board information.
