@@ -15,7 +15,7 @@ class Board(models.Model):
     ticket_count = models.PositiveIntegerField(default=0, help_text="Number of tickets to do")
     tasks_to_do_count = models.PositiveIntegerField(default=0, help_text="Number of tasks to do")
     tasks_hight_prio_count = models.PositiveIntegerField(default=0, help_text="Number of high priority tasks")
-    owner_id = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='boards')
+    owner = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='boards')
     rewiewers = models.ManyToManyField(CustomUser, verbose_name=("reviewers"), related_name='board_reviewers', blank=True, help_text="Users who can review tasks in the board")
     due_date = models.DateField(null=True, blank=True, help_text="Due date for the board tasks")
 

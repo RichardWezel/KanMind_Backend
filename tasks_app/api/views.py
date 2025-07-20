@@ -17,6 +17,7 @@ from boards_app.models import Board
 from .permissions import IsMemberOfBoard, IsMemberOfBoardComments, IsAuthorOfComment
 from auth_app.models import CustomUser
 
+
 def internal_error_response_500(e):
     """
     Return a standardized 500 Internal Server Error response.
@@ -217,7 +218,7 @@ class TaskDetailView(generics.RetrieveUpdateDestroyAPIView):
         - Only the assignee or board owner may delete the task.
     """
 
-    permission_classes = [IsAuthenticatedWithCustomMessage, IsMemberOfBoard ]
+    permission_classes = [IsAuthenticatedWithCustomMessage, IsMemberOfBoard]
     serializer_class = TaskUpdateSerializer
     
     def get_queryset(self):
@@ -237,9 +238,10 @@ class TaskDetailView(generics.RetrieveUpdateDestroyAPIView):
             Response: Updated task data.
         """
         try:
-            Task = self.get_object()
+            instance = self.get_object()
+
             serializer = self.get_serializer(
-                Task, 
+                instance, 
                 data=request.data, 
                 partial=kwargs.pop('partial', False)
             )
@@ -264,10 +266,11 @@ class TaskDetailView(generics.RetrieveUpdateDestroyAPIView):
         try:
             instance = self.get_object()
 
-            if instance.assignee != request.user and instance.board.owner_id != request.user:
+            if instance.assignee != request.user and instance.board.owner != request.user:
                 raise PermissionDenied("Only the editor or the board owner may delete the task and the specified board does not exist.")
 
             self.perform_destroy(instance)
+            print(f"[DEBUG] Trying to delete task {instance.id} by user {request.user}")
             return Response(status=status.HTTP_204_NO_CONTENT)
 
         except (PermissionDenied, Http404, NotFound) as e:
@@ -275,6 +278,8 @@ class TaskDetailView(generics.RetrieveUpdateDestroyAPIView):
 
         except Exception as e:
             return internal_error_response_500(e)
+        
+        
 
 
 class TaskCommentsView(generics.ListAPIView):

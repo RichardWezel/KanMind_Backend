@@ -26,13 +26,10 @@ class IsMemberOfBoard(BasePermission):
         """
         Check global permissions for a request.
 
-        For POST: ensure the user is a member or the owner of the specified board.
-        For other methods: allow access.
-
-        Returns:
-            bool: True if access is granted.
+        - For POST: ensure the user is a member or the owner of the specified board.
+        - For other methods: allow access (object-level check will apply).
         """
-
+        print(f"[DEBUG] has_permission called for {request.method} by {request.user}")
         if request.method == "POST":
             board_id = request.data.get("board")
             try:
@@ -44,9 +41,12 @@ class IsMemberOfBoard(BasePermission):
                 raise NotFound("Board not found.")
 
             board = Board.objects.get(id=board_id)
-            if request.user not in board.members.all() and board.owner_id != request.user:
+            if request.user not in board.members.all() and board.owner_id != request.user.id:
                 return False
-            return True  
+            return True
+
+        return True
+
 
     def has_object_permission(self, request, view, obj):
         """

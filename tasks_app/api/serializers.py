@@ -147,6 +147,26 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
             'due_date'
         ]
         read_only_fields = ['id']
+
+    def validate(self, attrs):
+        assignee = attrs.get("assignee", self.instance.assignee if self.instance else None)
+        reviewer = attrs.get("reviewer", self.instance.reviewer if self.instance else None)
+        board = self.instance.board
+    
+        try:
+            owner = CustomUser.objects.get(id=board.owner_id)
+        except CustomUser.DoesNotExist:
+            raise serializers.ValidationError("Board owner does not exist.")
+    
+        allowed_users = list(board.members.all()) + [owner]
+    
+        if assignee and assignee not in allowed_users:
+            raise serializers.ValidationError({"assignee_id": "User is not a member of the board."})
+    
+        if reviewer and reviewer not in allowed_users:
+            raise serializers.ValidationError({"reviewer_id": "User is not a member of the board."})
+    
+        return attrs
     
     def update(self, instance, validated_data):
         """
