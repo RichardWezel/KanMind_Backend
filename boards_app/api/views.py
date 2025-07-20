@@ -163,6 +163,10 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         """
 
         try:
+            # Absicherung: request.data parst JSON, kann aber bei kaputtem Input crashen
+            if not isinstance(request.data, dict):
+                raise ValidationError({"detail": "Invalid JSON format."})
+            
             partial = kwargs.pop('partial', False)
             instance = self.get_object()
 

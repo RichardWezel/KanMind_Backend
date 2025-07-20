@@ -66,6 +66,15 @@ class BoardDetailSerializer (serializers.ModelSerializer):
         fields = ['id', 'title', 'owner_id', 'members', 'tasks']
         read_only_fields = ['id', 'title', 'owner_id', 'members', 'tasks']
 
+    def validate_title(self, value):
+        if not isinstance(value, str):
+            raise serializers.ValidationError("Title must be a string.")
+        if value.strip() == "":
+            raise serializers.ValidationError("Title cannot be empty.")
+        if value.isdigit():
+            raise serializers.ValidationError("Title must not be a number.")
+        return value
+
 
 class BoardUpdateSerializer(serializers.ModelSerializer):
     """
