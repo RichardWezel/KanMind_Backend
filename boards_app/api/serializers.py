@@ -99,10 +99,10 @@ class BoardUpdateSerializer(serializers.ModelSerializer):
     members = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=CustomUser.objects.all(),
-        write_only=True
+        write_only=True,
     )
     owner_data = UserSerializer(source='owner_id', read_only=True)
-    members_data = UserSerializer(many=True, source='members', read_only=True)
+    members_data = serializers.SerializerMethodField()
    
     class Meta:
         model = Board
@@ -113,3 +113,6 @@ class BoardUpdateSerializer(serializers.ModelSerializer):
             'members': {'required': True}
         }
     
+    def get_members_data(self, obj):
+        members = obj.members.all().order_by('id')  # 👈 Sortierung nach ID
+        return UserSerializer(members, many=True).data
