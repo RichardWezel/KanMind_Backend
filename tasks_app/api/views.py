@@ -96,6 +96,8 @@ class TaskAssignedToMeView(ListCreateAPIView):
         """
         try:
             queryset = self.get_queryset().filter(assignee=request.user)
+            if not queryset.exists():
+                return Response({"detail": "No tasks assigned to you."})
             serializer = self.get_serializer(queryset, many=True)
             return Response(serializer.data)
         except Exception as e:
@@ -183,6 +185,8 @@ class TaskReviewingView(ListAPIView):
         """
         try:
             queryset = self.get_queryset()
+            if not queryset.exists():
+                return Response({"detail": "No tasks under review."})
             serializer = self.get_serializer(queryset, many=True)
             return Response(serializer.data)
         except Exception as e:
