@@ -41,7 +41,7 @@ class IsMemberOfBoard(BasePermission):
                 raise NotFound("Board not found.")
 
             board = Board.objects.get(id=board_id)
-            if request.user not in board.members.all() and board.owner_id != request.user.id:
+            if request.user not in board.members.all() and board.owner != request.user.id:
                 return False
             return True
 
@@ -59,7 +59,7 @@ class IsMemberOfBoard(BasePermission):
         """
 
         user = request.user
-        owner = obj.board.owner_id
+        owner = obj.board.owner
         board = obj.board
         if user not in board.members.all() and user != owner:
             raise PermissionDenied("You are not a member of this board.")
@@ -105,7 +105,7 @@ class IsMemberOfBoardComments(BasePermission):
             raise NotFound("Task does not exist.")
 
         board = task.board
-        if user not in board.members.all() and user.id != board.owner_id:
+        if user not in board.members.all() and user.id != board.owner:
             raise PermissionDenied("You are not a member of this board.")
 
         return True
@@ -120,7 +120,7 @@ class IsMemberOfBoardComments(BasePermission):
 
         user = request.user
         board = obj.task.board
-        if user not in board.members.all() and user.id != board.owner_id:
+        if user not in board.members.all() and user.id != board.owner:
             raise PermissionDenied("You are not a member of this board.")
         return True
 

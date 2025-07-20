@@ -150,7 +150,7 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         board = get_object_or_404(Board, pk=self.kwargs.get('pk'))
         user = self.request.user
     
-        if board.owner_id != user and not board.members.filter(id=user.id).exists():
+        if board.owner != user and not board.members.filter(id=user.id).exists():
             raise PermissionDenied("You do not have access to this board.")
     
         return board
@@ -211,7 +211,7 @@ class BoardDetailView(generics.RetrieveUpdateDestroyAPIView):
         try:
             board = get_object_or_404(Board, pk=self.kwargs.get('pk'))
 
-            if board.owner_id != request.user:
+            if board.owner != request.user:
                 raise PermissionDenied("Only the owner may delete the board.")
 
             self.perform_destroy(board)

@@ -33,5 +33,3 @@ class Board(models.Model):
         verbose_name = "Board"
         verbose_name_plural = "Boards"
         ordering = ['title']
-
-        
