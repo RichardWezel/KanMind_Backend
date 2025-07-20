@@ -1,6 +1,8 @@
 from django.db import models
 from auth_app.models import CustomUser
 from boards_app.models import Board
+from django.utils.timezone import now
+import datetime
 
 
 class Task(models.Model):

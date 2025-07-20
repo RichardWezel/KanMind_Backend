@@ -90,13 +90,15 @@ class TaskCreateSerializer(serializers.ModelSerializer):
     reviewer_id = pk_field_for('reviewer')
     status = serializers.ChoiceField(
         choices=Task.STATUS_CHOICES,
-        default=Task.STATUS_TODO
+        default=Task.STATUS_TODO,
     )
     priority = serializers.ChoiceField(
         choices=Task.PRIORITY_CHOICES,
-        default=Task.PRIORITY_LOW
+        default=Task.PRIORITY_LOW,
     )
-    
+    due_date = serializers.DateField(
+        required=True
+    )
     class Meta:
         model = Task
         fields = [

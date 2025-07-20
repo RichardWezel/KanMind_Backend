@@ -15,6 +15,7 @@ from tasks_app.models import Task, TaskComment
 from boards_app.api.permissions import IsAuthenticatedWithCustomMessage
 from boards_app.models import Board
 from .permissions import IsMemberOfBoard, IsMemberOfBoardComments, IsAuthorOfComment
+from auth_app.models import CustomUser
 
 def internal_error_response_500(e):
     """
@@ -138,11 +139,25 @@ class CreateTaskView(CreateAPIView):
             if not Board.objects.filter(id=board_id).exists():
                 raise NotFound("The specified board does not exist.")
             
-            data['board'] = board_id  # ← wichtig! Überschreibt den fehlerhaften String
+            data['board'] = board_id  
 
             for field in ['assignee_id', 'reviewer_id']:
                 if data.get(field) == "":
                     data[field] = None
+
+            board = Board.objects.get(id=board_id)
+            for user_field in ['assignee_id', 'reviewer_id']:
+                user_id = data.get(user_field)
+                if user_id is not None:
+                    try:
+                        user = CustomUser.objects.get(id=user_id)
+                    except CustomUser.DoesNotExist:
+                        raise ValidationError({user_field: f"User with ID {user_id} does not exist."})
+
+                    if user not in board.members.all():
+                        raise ValidationError({
+                            user_field: f"{user_field} must be a member of the board."
+                        })
 
             serializer = self.get_serializer(data=data)
             serializer.is_valid(raise_exception=True)
