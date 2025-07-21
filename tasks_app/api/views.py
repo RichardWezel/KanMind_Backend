@@ -8,7 +8,7 @@ from rest_framework import status
 from rest_framework.generics import ListCreateAPIView, CreateAPIView, ListAPIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework import generics
-from rest_framework.exceptions import NotFound, ValidationError, PermissionDenied
+from rest_framework.exceptions import NotFound, ValidationError, PermissionDenied, ParseError
 
 from tasks_app.api.serializers import TaskSerializer, TaskCreateSerializer, TaskUpdateSerializer, TaskCommentSerializer
 from tasks_app.models import Task, TaskComment
@@ -249,8 +249,8 @@ class TaskDetailView(generics.RetrieveUpdateDestroyAPIView):
             task = serializer.save()
             return Response(self.get_serializer(task).data, status=status.HTTP_200_OK)
         
-        except (ValidationError, PermissionDenied, Http404, NotFound) as e:
-            raise e  
+        except (ValidationError, ParseError, PermissionDenied, Http404, NotFound) as e:
+            return Response({'detail': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
         except Exception as e:
             return internal_error_response_500(e)
