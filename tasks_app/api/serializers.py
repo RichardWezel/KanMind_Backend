@@ -27,6 +27,18 @@ def pk_field_for(source_name):
         allow_null=True   
     )
 
+class UserIDField(serializers.PrimaryKeyRelatedField):
+    """
+    A custom field that ensures the input is a plain ID (not a dict).
+    """
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            raise serializers.ValidationError(
+                "Invalid format. Please provide only an ID (e.g., 3), not an object."
+            )
+        return super().to_internal_value(data)
+
 class TaskSerializer(serializers.ModelSerializer):
     """
     Serializer for displaying task data.
@@ -121,14 +133,15 @@ class TaskUpdateSerializer(serializers.ModelSerializer):
     - nested user objects for assignee and reviewer
     """
 
-    assignee_id = serializers.PrimaryKeyRelatedField(
+    assignee_id = UserIDField(
         queryset=CustomUser.objects.all(),
         source='assignee',
         write_only=True,
         required=False,
         allow_null=True
     )
-    reviewer_id = serializers.PrimaryKeyRelatedField(
+
+    reviewer_id = UserIDField(
         queryset=CustomUser.objects.all(),
         source='reviewer',
         write_only=True,
