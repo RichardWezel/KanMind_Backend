@@ -91,7 +91,7 @@ class BoardView(ListCreateAPIView):
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
 
-            board = serializer.save(owner_id=request.user)
+            board = serializer.save(owner=request.user)
             board.members.add(request.user)
             board.member_count = board.members.count()
             board.save()

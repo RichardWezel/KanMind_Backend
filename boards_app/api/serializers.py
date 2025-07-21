@@ -27,7 +27,7 @@ class BoardSerializer (serializers.ModelSerializer):
         queryset=CustomUser.objects.all(),
         write_only=True
     )
-    owner_id = serializers.PrimaryKeyRelatedField(read_only=True)
+    owner_id = serializers.PrimaryKeyRelatedField(source='owner.id',read_only=True)
 
     class Meta:
         model = Board
@@ -58,7 +58,7 @@ class BoardDetailSerializer (serializers.ModelSerializer):
     """
 
     members = UserSerializer(many=True)
-    owner_id = serializers.PrimaryKeyRelatedField(read_only=True)
+    owner_id = serializers.PrimaryKeyRelatedField(source='owner.id',read_only=True)
     tasks = TasksBoardDetailsSerializer(many=True, read_only=True)
 
     class Meta:
@@ -101,7 +101,7 @@ class BoardUpdateSerializer(serializers.ModelSerializer):
         queryset=CustomUser.objects.all(),
         write_only=True,
     )
-    owner_data = UserSerializer(source='owner_id', read_only=True)
+    owner_data = UserSerializer(source='owner', read_only=True)
     members_data = serializers.SerializerMethodField()
    
     class Meta:
