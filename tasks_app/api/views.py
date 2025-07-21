@@ -270,8 +270,7 @@ class TaskDetailView(generics.RetrieveUpdateDestroyAPIView):
                 raise PermissionDenied("Only the editor or the board owner may delete the task and the specified board does not exist.")
 
             self.perform_destroy(instance)
-            print(f"[DEBUG] Trying to delete task {instance.id} by user {request.user}")
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response({},status=status.HTTP_204_NO_CONTENT)
 
         except (PermissionDenied, Http404, NotFound) as e:
             raise e
@@ -439,8 +438,10 @@ class TaskDeleteCommentView(generics.DestroyAPIView):
         try:
             instance = self.get_object()
             self.perform_destroy(instance)
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            return Response({}, status=status.HTTP_204_NO_CONTENT)
 
+        except (NotFound, PermissionDenied) as e:
+            raise e
         except Exception as e:
             return internal_error_response_500(e)
 
