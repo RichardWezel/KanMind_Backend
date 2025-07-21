@@ -20,7 +20,7 @@ class IsOwnerOrMemberOfBoard(BasePermission):
     def has_object_permission(self, request, view, obj):
         user = request.user
 
-        if user == obj.owner_id or user in obj.members.all():
+        if user == obj.owner or user in obj.members.all():
             return True
         
         raise PermissionDenied()
