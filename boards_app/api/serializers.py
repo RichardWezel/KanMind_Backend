@@ -45,6 +45,14 @@ class BoardSerializer (serializers.ModelSerializer):
             raise serializers.ValidationError("Title must not be a number.")
         return value
     
+    def validate_members(self, value):
+        if not isinstance(value, (list, tuple)):
+            raise serializers.ValidationError("Members must be a list of user objects.")
+        for member in value:
+            if isinstance(member, str):
+                raise serializers.ValidationError("Members must not contain strings.")
+        return value
+    
 
 class BoardDetailSerializer (serializers.ModelSerializer):
     """
